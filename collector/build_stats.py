@@ -28,7 +28,7 @@ OUT = Path(os.environ.get("CP_SITE_DATA", ROOT / "site" / "data"))
 WINDOW_DAYS = int(os.environ.get("WINDOW_DAYS", "84"))  # 12 weeks
 
 SERVICES = {"AP": "Alfa Pendular", "IC": "Intercidades", "IR": "InterRegional",
-            "R": "Regional", "U": "Urbano", "IN": "Internacional"}
+            "R": "Regional", "U": "Urbano", "IN": "Internacional", "ES": "Especial"}
 
 
 def read_day(p: Path):

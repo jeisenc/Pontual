@@ -1,75 +1,68 @@
 #!/usr/bin/env python3
 """
-CP delay collector.
+Pontual collector — live data from Infraestruturas de Portugal (IP).
 
-Runs every ~15 minutes. Each run:
-  1. Reads the departure boards of a few hub stations to discover train numbers
-     (and adds new ones to the catalogue, with their full timetable).
-  2. For every catalogued train whose scheduled arrival at its final stop has
-     passed, fetches the train once. If CP reports it COMPLETED or CANCELLED,
-     the final per-stop delays are appended to data/days/YYYY-MM-DD.jsonl.
-     Trains still running are retried on the next run.
+IP publishes delays only while a train is running ("Circula com atraso de 9 min.",
+and "Hora Prevista:16:31" against each stop still ahead). Once a stop is passed,
+its delay is no longer shown. So every run (about every 10 minutes):
 
-Standard library only. All times are Europe/Lisbon.
+  1. Read the departure boards of a few hub stations for the next ~90 minutes to
+     discover which trains are about to run, and fetch each new train's timetable.
+  2. Fetch every train that is running now. For each stop still ahead, keep the
+     latest predicted delay. When a stop is passed, its last prediction becomes
+     its recorded delay.
+  3. When a train has passed its last stop (or is cancelled, or never shows up),
+     write its record to data/days/YYYY-MM-DD.jsonl.
+
+Standard library only. Times are Europe/Lisbon.
 """
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import os
 import random
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Lisbon")
-BASE = os.environ.get("CP_BASE", "https://www.cp.pt/sites/spring").rstrip("/")
+BASE = os.environ.get("IP_BASE", "https://www.infraestruturasdeportugal.pt/negocios-e-servicos").rstrip("/")
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("CP_DATA_DIR", ROOT / "data"))
 
-# Hub stations whose boards, between them, see every train on the network
-# (greedy set cover over a full CP timetable: these 18 cover 100% of services).
-HUBS = [
-    "94-31039",  # Lisboa Oriente
-    "94-2006",   # Porto Campanhã
-    "94-69179",  # Oeiras
-    "94-61002",  # Agualva-Cacém
-    "94-36004",  # Coimbra-B
-    "94-68007",  # Pinhal Novo
-    "94-73007",  # Faro
-    "94-38000",  # Aveiro
-    "94-6007",   # Nine
-    "94-44016",  # Espinho-Vouga
-    "94-53009",  # Castelo Branco
-    "94-75002",  # Beja
-    "94-63008",  # Caldas da Rainha
-    "94-10009",  # Régua
-    "94-49007",  # Guarda
-    "94-34009",  # Entroncamento
-    "94-90290",  # Portimão
-    "94-7005",   # Valença
-]
+TYPES = "INTERNACIONAL, ALFA, IC, IR, REGIONAL, URB|SUBUR, ESPECIAL"
+SVC = {"ALFA": "AP", "IC": "IC", "IR": "IR", "REGIONAL": "R", "URB|SUBUR": "U",
+       "INTERNACIONAL": "IN", "ESPECIAL": "ES"}
 
-BUFFER_MIN = 15          # wait this long after scheduled final arrival before first check
-NO_SERVICE_AFTER = 60    # status still null this long after due → train didn't run today
-GIVE_UP_AFTER = 8 * 60   # still not completed this long after due → save what we have
+# Hub stations (IP node ids) whose boards, between them, see every CP train.
+HUBS = [9431039, 9402006, 9469179, 9461002, 9436004, 9468007, 9473007, 9438000, 9406007,
+        9444016, 9453009, 9475002, 9463008, 9410009, 9449007, 9434009, 9490290, 9407005,
+        9430007, 9459006, 9469260, 9401008]   # + Santa Apolónia, Rossio, Cascais, São Bento
+
+WINDOW_BACK, WINDOW_AHEAD = 40, 90   # minutes of board to read around "now"
+FINISH_GRACE = 120                   # after scheduled end + this, close the train anyway
 WORKERS = 6
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/124.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "pt-PT,pt;q=0.9,en;q=0.8",
-    "Referer": "https://www.cp.pt/",
-    "Origin": "https://www.cp.pt",
+    "Accept-Language": "pt-PT,pt;q=0.9",
+    "Referer": "https://www.infraestruturasdeportugal.pt/",
+    "X-Requested-With": "XMLHttpRequest",
 }
 
-stats = {"requests": 0, "ok": 0, "failed": 0}
+stats = Counter()
+unknown_status = Counter()
 
 
 def log(*a):
@@ -81,31 +74,57 @@ def get_json(url: str, tries: int = 3):
         stats["requests"] += 1
         try:
             req = urllib.request.Request(url, headers=HEADERS)
-            with urllib.request.urlopen(req, timeout=25) as r:
+            with urllib.request.urlopen(req, timeout=30) as r:
                 body = r.read()
+            out = json.loads(body)
             stats["ok"] += 1
-            return json.loads(body)
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ConnectionError) as e:
+            return out
+        except urllib.error.HTTPError as e:
             stats["failed"] += 1
-            code = getattr(e, "code", None)
-            if code == 404:
+            if e.code == 404:
                 return None
-            if attempt == tries - 1:
-                log("FAIL", url, repr(e)[:160])
-                return None
+        except Exception:
+            stats["failed"] += 1
+        if attempt < tries - 1:
             time.sleep(1.5 * (attempt + 1) + random.random())
+    return None
 
 
-def unwrap(x):
-    """Some CP responses wrap the payload in {"data": ...} or {"response": ...}."""
-    if isinstance(x, dict):
-        for k in ("data", "response"):
-            if k in x and len(x) <= 3:
-                return x[k]
-    return x
+# ---------- small helpers ----------
+
+def hm(s: str | None) -> int | None:
+    if not s:
+        return None
+    m = re.match(r"(\d{1,2}):(\d{2})", s.strip())
+    return int(m.group(1)) * 60 + int(m.group(2)) if m else None
 
 
-# ---------- files ----------
+def fmt(mins: int) -> str:
+    mins %= 1440
+    return f"{mins // 60:02d}:{mins % 60:02d}"
+
+
+SMALL = {"de", "do", "da", "dos", "das", "e"}
+
+
+def nice(name: str) -> str:
+    """'VILA FR. DE XIRA' → 'Vila Fr. de Xira'; 'PORTO-CAMPANHÃ' → 'Porto-Campanhã'."""
+    words = []
+    for i, w in enumerate(name.strip().split(" ")):
+        t = "-".join(p.capitalize() for p in w.lower().split("-"))
+        t = ".".join(p[:1].upper() + p[1:] for p in t.split("."))
+        words.append(w.lower() if i and w.lower() in SMALL else t)
+    return " ".join(words)
+
+
+def delay_of(text: str | None) -> int | None:
+    m = re.search(r"atraso de (\d+)", text or "", re.I)
+    return int(m.group(1)) if m else None
+
+
+def is_cancelled(text: str | None) -> bool:
+    return bool(re.search(r"suprim|cancel", text or "", re.I))
+
 
 def load_json(p: Path, default):
     try:
@@ -121,171 +140,154 @@ def save_json(p: Path, obj):
     tmp.replace(p)
 
 
-def day_file(d: date) -> Path:
-    return DATA / "days" / f"{d.isoformat()}.jsonl"
+# ---------- IP calls ----------
+
+def board(node: int, t0: datetime, t1: datetime):
+    url = (f"{BASE}/partidas-chegadas/{node}/{quote(t0.strftime('%Y-%m-%d %H:%M'))}/"
+           f"{quote(t1.strftime('%Y-%m-%d %H:%M'))}/{quote(TYPES)}")
+    j = get_json(url)
+    try:
+        return j["response"][0]["NodesComboioTabelsPartidasChegadas"] or []
+    except (TypeError, KeyError, IndexError):
+        return []
 
 
-def done_trains(d: date) -> set[int]:
-    p = day_file(d)
-    if not p.exists():
-        return set()
-    out = set()
-    for line in p.read_text("utf-8").splitlines():
-        if line.strip():
-            out.add(json.loads(line)["n"])
-    return out
+def train(n: int, d: date):
+    j = get_json(f"{BASE}/horarios-ncombio/{n}/{d.isoformat()}")
+    r = (j or {}).get("response") if isinstance(j, dict) else None
+    return r if isinstance(r, dict) and r.get("NodesPassagemComboio") else None
 
 
-# ---------- timetable helpers ----------
-
-def hm(s: str | None) -> int | None:
-    if not s:
-        return None
-    h, m = s.split(":")[:2]
-    return int(h) * 60 + int(m)
-
-
-def schedule_span(stops: list) -> tuple[int, int] | None:
-    """(start, end) in minutes after service-day midnight; end may exceed 1440."""
-    # stops are [code, arr, dep]
-    seq = []
-    for code, arr, dep in stops:
-        for t in (arr, dep):
-            v = hm(t)
-            if v is not None:
-                seq.append(v)
-    if not seq:
-        return None
-    start, prev, offset = seq[0], seq[0], 0
-    for v in seq[1:]:
-        if v + offset < prev - 180:   # wrapped past midnight
-            offset += 1440
-        prev = v + offset
-    return start, prev
-
-
-def update_catalog(catalog: dict, stations: dict, train: dict) -> None:
-    stops = train.get("trainStops") or []
-    if not stops:
-        return
-    n = str(train["trainNumber"])
-    svc = (train.get("serviceCode") or {}).get("code") or "?"
-    compact = []
-    for s in stops:
-        st = s.get("station") or {}
-        code = st.get("code")
-        if not code:
+def timetable(t: dict) -> dict:
+    """Compact timetable: stops as [node, scheduled 'HH:MM'], minutes since service-day midnight."""
+    stops, seq, off, prev = [], [], 0, None
+    for s in t["NodesPassagemComboio"]:
+        v = hm(s.get("HoraProgramada"))
+        if v is None:
             continue
-        compact.append([code, s.get("arrival"), s.get("departure")])
-        if code not in stations:
-            stations[code] = [st.get("designation") or code, s.get("latitude"), s.get("longitude")]
-    span = schedule_span(compact)
-    if not span:
-        return
-    catalog[n] = {"svc": svc, "stops": compact, "start": span[0], "end": span[1]}
-
-
-def to_record(train: dict, status: str) -> dict:
-    stops = []
-    for s in train.get("trainStops") or []:
-        code = (s.get("station") or {}).get("code")
-        if code:
-            stops.append([code, s.get("arrival"), s.get("departure"), s.get("delay")])
-    return {
-        "n": train["trainNumber"],
-        "svc": (train.get("serviceCode") or {}).get("code") or "?",
-        "st": status,
-        "d": train.get("delay"),
-        "stops": stops,
-        "t": datetime.now(TZ).strftime("%Y-%m-%dT%H:%M"),
-    }
+        if prev is not None and v + off < prev - 180:
+            off += 1440
+        prev = v + off
+        stops.append([str(s["NodeID"]), s["HoraProgramada"][:5]])
+        seq.append(prev)
+    return {"svc": SVC.get(t.get("TipoServico", ""), "?"), "stops": stops,
+            "start": seq[0] if seq else None, "end": seq[-1] if seq else None}
 
 
 # ---------- main steps ----------
 
-def discover(catalog: dict, stations: dict) -> int:
-    seen: set[int] = set()
+def discover(now: datetime, catalog: dict, stations: dict) -> int:
+    """Read hub boards around now; add new (date, train) timetables to the catalog."""
+    t0, t1 = now - timedelta(minutes=WINDOW_BACK), now + timedelta(minutes=WINDOW_AHEAD)
+    seen: set[tuple[str, int]] = set()
+    with ThreadPoolExecutor(WORKERS) as ex:
+        for rows in ex.map(lambda h: board(h, t0, t1), HUBS):
+            for r in rows:
+                n = r.get("NComboio1")
+                try:
+                    d = datetime.strptime(r.get("DataRealizacao", ""), "%d-%m-%Y").date().isoformat()
+                except ValueError:
+                    d = now.date().isoformat()
+                if isinstance(n, int):
+                    seen.add((d, n))
+    new = [(d, n) for d, n in seen if str(n) not in catalog.get(d, {})]
+    stats["board_trains"] = len(seen)
 
-    def board(code):
-        return unwrap(get_json(f"{BASE}/station/trains?stationId={code}"))
+    def fetch(item):
+        d, n = item
+        return item, train(n, date.fromisoformat(d))
 
     with ThreadPoolExecutor(WORKERS) as ex:
-        for res in ex.map(board, HUBS):
-            if isinstance(res, list):
-                for row in res:
-                    n = row.get("trainNumber")
-                    if isinstance(n, int):
-                        seen.add(n)
-    new = [n for n in seen if str(n) not in catalog]
-    log(f"boards: {len(seen)} trains seen, {len(new)} new")
-
-    def detail(n):
-        return unwrap(get_json(f"{BASE}/station/trains/train?trainId={n}"))
-
-    with ThreadPoolExecutor(WORKERS) as ex:
-        for t in ex.map(detail, new):
-            if isinstance(t, dict) and t.get("trainNumber"):
-                update_catalog(catalog, stations, t)
+        for (d, n), t in ex.map(fetch, new):
+            if not t:
+                continue
+            tt = timetable(t)
+            if tt["start"] is None:
+                continue
+            catalog.setdefault(d, {})[str(n)] = tt
+            for s in t["NodesPassagemComboio"]:
+                stations.setdefault(str(s["NodeID"]), [nice(s.get("NomeEstacao", "")), None, None])
     return len(new)
 
 
-def collect(catalog: dict, stations: dict, now: datetime) -> dict:
-    today = now.date()
-    pending: list[tuple[int, date, datetime]] = []
-    for sd in (today - timedelta(days=1), today):
-        done = done_trains(sd)
-        midnight = datetime(sd.year, sd.month, sd.day, tzinfo=TZ)
-        for n, c in catalog.items():
-            n = int(n)
-            if n in done:
+def observe(now: datetime, catalog: dict, live: dict) -> dict:
+    """Sample every train that should be running; update per-stop estimates."""
+    due = []
+    for d, trains in catalog.items():
+        mid = datetime.fromisoformat(d).replace(tzinfo=TZ)
+        for n, tt in trains.items():
+            key = f"{d}/{n}"
+            if live.get(key, {}).get("done"):
                 continue
-            # A service belongs to the day it departs. After midnight, only late-
-            # evening trains (due from 22:00 on) are still looked up for
-            # yesterday's date; an early-morning train fetched today is today's run.
-            if sd < today and c["end"] + BUFFER_MIN < 22 * 60:
-                continue
-            due = midnight + timedelta(minutes=c["end"] + BUFFER_MIN)
-            if due <= now <= due + timedelta(minutes=GIVE_UP_AFTER + 30):
-                pending.append((n, sd, due))
-    log(f"pending checks: {len(pending)}")
+            start = mid + timedelta(minutes=tt["start"] - 10)
+            end = mid + timedelta(minutes=tt["end"] + FINISH_GRACE)
+            if start <= now <= end or (key in live and now > end):
+                due.append((d, n, tt))
+    stats["due"] = len(due)
 
     def fetch(item):
-        n, sd, due = item
-        return item, unwrap(get_json(f"{BASE}/station/trains/train?trainId={n}"))
+        d, n, tt = item
+        return item, train(int(n), date.fromisoformat(d))
 
-    counts = {"completed": 0, "cancelled": 0, "no_service": 0, "unresolved": 0, "waiting": 0, "error": 0}
-    out: dict[date, list] = {}
+    finished = {}
     with ThreadPoolExecutor(WORKERS) as ex:
-        for (n, sd, due), t in ex.map(fetch, pending):
-            if not isinstance(t, dict) or not t.get("trainNumber"):
-                counts["error"] += 1
+        for (d, n, tt), t in ex.map(fetch, due):
+            key = f"{d}/{n}"
+            st = live.setdefault(key, {"est": {}, "passed": [], "polls": 0, "cur": None})
+            mid = datetime.fromisoformat(d).replace(tzinfo=TZ)
+            overdue = now > mid + timedelta(minutes=tt["end"] + FINISH_GRACE)
+            if not t:
+                if overdue:
+                    finished[key] = ("UNRESOLVED" if st["polls"] else "NO_SERVICE", d, n, tt, st)
                 continue
-            update_catalog(catalog, stations, t)
-            status = (t.get("status") or "").upper()
-            late_by = (now - due).total_seconds() / 60
-            has_delays = any((s.get("delay") is not None) for s in t.get("trainStops") or [])
-            yesterday = sd < today
-            if status == "COMPLETED":
-                rec, k = to_record(t, "OK"), "completed"
-            elif status == "CANCELLED":
-                rec, k = to_record(t, "CANCELLED"), "cancelled"
-            elif yesterday and not status and not has_delays:
-                # After midnight a null status may already be *today's* run, so
-                # it says nothing about yesterday. Wait; drop if never resolved.
-                counts["waiting"] += 1
-                continue
-            elif not status and not has_delays and late_by >= NO_SERVICE_AFTER:
-                rec, k = {"n": n, "st": "NO_SERVICE"}, "no_service"
-            elif late_by >= GIVE_UP_AFTER and has_delays:
-                rec, k = to_record(t, "UNRESOLVED"), "unresolved"
-            else:
-                counts["waiting"] += 1
-                continue
-            counts[k] += 1
-            out.setdefault(sd, []).append(rec)
+            st["polls"] += 1
+            sit = t.get("SituacaoComboio") or ""
+            cur = delay_of(sit)
+            nodes = t["NodesPassagemComboio"]
+            any_passed = any(x.get("ComboioPassou") for x in nodes)
+            if cur is None and any_passed and not is_cancelled(sit):
+                cur = 0                          # running, no delay announced
+            if sit and cur is None and not is_cancelled(sit) and sit.lower() != "programado":
+                unknown_status[sit[:60]] += 1
+            st["cur"] = cur
+            for i, x in enumerate(nodes):
+                k = str(i)
+                if x.get("ComboioPassou"):
+                    if k not in st["passed"]:
+                        st["passed"].append(k)
+                        # Passed since last look: keep the estimate made before it passed;
+                        # if we never had one, the train's current delay is the best guess.
+                        if k not in st["est"] and cur is not None:
+                            st["est"][k] = cur
+                    continue
+                prev = hm((re.search(r"Prevista:\s*(\d{1,2}:\d{2})", x.get("Observacoes") or "") or [None, None])[1])
+                sched = hm(x.get("HoraProgramada"))
+                if prev is not None and sched is not None:
+                    st["est"][k] = max(0, (prev - sched + 720) % 1440 - 720)
+                elif cur is not None:
+                    st["est"][k] = cur
+            if is_cancelled(sit):
+                finished[key] = ("CANCELLED", d, n, tt, st)
+            elif nodes and nodes[-1].get("ComboioPassou"):
+                finished[key] = ("OK", d, n, tt, st)
+            elif overdue:
+                finished[key] = ("UNRESOLVED" if any_passed else "NO_SERVICE", d, n, tt, st)
 
-    for sd, recs in out.items():
-        p = day_file(sd)
+    counts = Counter()
+    out: dict[str, list] = {}
+    for key, (status, d, n, tt, st) in finished.items():
+        counts[status] += 1
+        live[key] = {"done": True}
+        if status == "NO_SERVICE":
+            rec = {"n": int(n), "st": "NO_SERVICE"}
+        else:
+            stops = [[code, hhmm, hhmm, (None if status == "CANCELLED" else st["est"].get(str(i)))]
+                     for i, (code, hhmm) in enumerate(tt["stops"])]
+            rec = {"n": int(n), "svc": tt["svc"], "st": status, "d": stops[-1][3] if stops else None,
+                   "stops": stops, "polls": st["polls"], "t": now.strftime("%Y-%m-%dT%H:%M")}
+        out.setdefault(d, []).append(rec)
+    for d, recs in out.items():
+        p = DATA / "days" / f"{d}.jsonl"
         p.parent.mkdir(parents=True, exist_ok=True)
         with p.open("a", encoding="utf-8") as f:
             for r in sorted(recs, key=lambda r: r["n"]):
@@ -293,15 +295,21 @@ def collect(catalog: dict, stations: dict, now: datetime) -> dict:
     return counts
 
 
-def compress_old_days(today: date) -> None:
-    """Days older than 2 days are final: gzip them to keep the repo small (~6x smaller)."""
-    import gzip
+def tidy(now: datetime, catalog: dict, live: dict):
+    """Drop finished state and old catalog days; gzip finished day files."""
+    keep = {(now.date() - timedelta(days=k)).isoformat() for k in range(2)}
+    for d in list(catalog):
+        if d not in keep:
+            del catalog[d]
+    for key in list(live):
+        if key.split("/")[0] not in keep:
+            del live[key]
     for p in sorted((DATA / "days").glob("*.jsonl")):
         try:
             d = date.fromisoformat(p.stem)
         except ValueError:
             continue
-        if (today - d).days >= 2:
+        if (now.date() - d).days >= 2:
             with p.open("rb") as src, gzip.open(str(p) + ".gz", "wb", compresslevel=9) as dst:
                 dst.write(src.read())
             p.unlink()
@@ -314,27 +322,37 @@ def main():
     now = datetime.fromisoformat(args.now).replace(tzinfo=TZ) if args.now else datetime.now(TZ)
 
     catalog = load_json(DATA / "catalog.json", {})
+    if catalog and not all(re.match(r"\d{4}-\d{2}-\d{2}$", k) for k in catalog):
+        catalog = {}                       # old CP-format catalog: start fresh
     stations = load_json(DATA / "stations.json", {})
+    stations = {k: v for k, v in stations.items() if "-" not in k}   # drop old CP-format codes
+    live = load_json(DATA / "live.json", {})
+
     t0 = time.time()
-    new = discover(catalog, stations)
-    counts = collect(catalog, stations, now)
+    new = discover(now, catalog, stations)
+    counts = observe(now, catalog, live)
+    tidy(now, catalog, live)
     save_json(DATA / "catalog.json", catalog)
     save_json(DATA / "stations.json", stations)
-    compress_old_days(now.date())
+    save_json(DATA / "live.json", live)
 
     health = {
+        "source": "infraestruturasdeportugal.pt",
         "last_run": now.strftime("%Y-%m-%dT%H:%M"),
         "seconds": round(time.time() - t0, 1),
-        "catalog_trains": len(catalog),
+        "catalog_trains": sum(len(v) for v in catalog.values()),
         "new_trains": new,
-        **counts,
-        **stats,
+        "tracking": sum(1 for v in live.values() if not v.get("done")),
+        "completed": counts["OK"], "cancelled": counts["CANCELLED"],
+        "no_service": counts["NO_SERVICE"], "unresolved": counts["UNRESOLVED"],
+        "unknown_status": dict(unknown_status.most_common(10)),
+        **{k: stats[k] for k in ("requests", "ok", "failed", "board_trains", "due")},
     }
     save_json(DATA / "health.json", health)
-    log("done", json.dumps(health))
-    # Fail loudly if CP is unreachable/blocking, so GitHub emails the owner.
+    (DATA / "probe.json").unlink(missing_ok=True)
+    log("done", json.dumps(health, ensure_ascii=False))
     if stats["requests"] >= 10 and stats["ok"] == 0:
-        sys.exit(2)
+        sys.exit(2)                        # source unreachable: fail so GitHub emails the owner
 
 
 if __name__ == "__main__":

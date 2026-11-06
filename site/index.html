@@ -769,13 +769,13 @@ footer code { font-family: var(--mono); }
     const has = c => c && IDX.stations.some(s => s.code === c);
     const busiest = [...IDX.stations].sort((a, b) => b.trains - a.trains);
     if (!has(S.code)) S.code = busiest[0]?.code;
-    // Default journey: Aveiro → Porto Campanhã when present, else the two busiest stations.
+    // Default journey: Aveiro → Porto-Campanhã when present, else the two busiest stations.
     if (!has(S.from) || !has(S.to)) {
-      [S.from, S.to] = has("94-38000") && has("94-2006") ? ["94-38000", "94-2006"] : [busiest[0]?.code, busiest[1]?.code];
+      [S.from, S.to] = has("9438000") && has("9402006") ? ["9438000", "9402006"] : [busiest[0]?.code, busiest[1]?.code];
     }
     const h = IDX.health || {};
     $("#foot").innerHTML = `<div>${IDX.dates.length} days of data (${IDX.dates[0] ? fmtDate(IDX.dates[0]) : "–"} – ${IDX.dates.at(-1) ? fmtDate(IDX.dates.at(-1)) : "–"}) · statistics built ${esc(IDX.generated.replace("T", " "))}${h.last_run ? ` · collector last ran ${esc(h.last_run.replace("T", " "))}, ${h.requests ? Math.round(100 * h.ok / h.requests) : 0}% of requests answered` : ""}</div>
-      <div>Unofficial. Based on the live service data CP shows on cp.pt; early arrivals count as on time. “Typical” is the median delay, “bad day” the 90th percentile.</div>`;
+      <div>Unofficial. Based on the live train data Infraestruturas de Portugal publishes, sampled every 10 minutes; early arrivals count as on time. “Typical” is the median delay, “bad day” the 90th percentile.</div>`;
     renderControls(); render();
     initRatings();
   })();
