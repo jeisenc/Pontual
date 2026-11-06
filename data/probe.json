@@ -1,0 +1,119 @@
+{
+ "run": "2026-11-06T16:09",
+ "results": {
+  "cp_board": {
+   "url": "https://www.cp.pt/sites/spring/station/trains?stationId=94-38000",
+   "status": 200,
+   "final_url": "https://www.cp.pt/sites/spring/station/trains?stationId=94-38000",
+   "headers": {
+    "Server": "CP - Comboios de Portugal",
+    "Content-Type": "text/html",
+    "Content-Length": "3306",
+    "X-Cache": "MISS from www.cp.pt"
+   },
+   "bytes": 3306,
+   "head": "<!doctype html>\n<html lang=\"pt\">\n\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>CP - Comboios de Portugal</title>\n  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap\" rel=\"stylesheet\">\n  <!-- OneTrust AutoBlocking script start for www-qua2.cp.pt -->\n   <!-- (needs to be the first script in the <head> section!!!) -->\n  <script type=\"text/javascript\"\n    src=\"https://cdn.cookielaw.org/consent/0199707f-8a12-73a1-aec0-1c75f3a7a833/OtAutoBlock.js\"></script>\n  <!-- OneTrust AutoBlocking script end for www-qua2.cp.pt -->\n  <!-- Global Site Tag (gtag.js) - Google Analytics -->\n  <script type=\"text/javascript\" src=\"/gtag_consents_default.js\"></script>\n  <script async src=\"https://www.googletagmanager.com/gtag/js?id=G-E5W1HWQ9XC\"></script>\n  <script async type=\"text/javascript\" src=\"/gtag_init.js\"></script>\n  <!-- fim GTAG -->\n  <!-- Google Tag Manager -->\n  <script>(function (w, d, s, l, i) {\n      w[l] = w[l] || []; w[l].push({\n        'gtm.start':\n\n          new Date().getTime(), event: 'gtm.js'\n      }); var f = d.getElementsByTagName(s)[0],\n\n        j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =\n\n          'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);\n\n    })(window, document, 'script', 'dataLayer', 'GTM-P966PFCT');</script>\n  <!-- End Google Tag Manager -->\n  <link rel=\"stylesheet\" type=\"tex",
+   "json": false
+  },
+  "cp_board_min_headers": {
+   "url": "https://www.cp.pt/sites/spring/station/trains?stationId=94-38000",
+   "status": 200,
+   "final_url": "https://www.cp.pt/sites/spring/station/trains?stationId=94-38000",
+   "headers": {
+    "Server": "CP - Comboios de Portugal",
+    "Content-Length": "3306",
+    "X-Cache": "REVALIDATE from www.cp.pt",
+    "Content-Type": "text/html"
+   },
+   "bytes": 3306,
+   "head": "<!doctype html>\n<html lang=\"pt\">\n\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>CP - Comboios de Portugal</title>\n  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap\" rel=\"stylesheet\">\n  <!-- OneTrust AutoBlocking script start for www-qua2.cp.pt -->\n   <!-- (needs to be the first script in the <head> section!!!) -->\n  <script type=\"text/javascript\"\n    src=\"https://cdn.cookielaw.org/consent/0199707f-8a12-73a1-aec0-1c75f3a7a833/OtAutoBlock.js\"></script>\n  <!-- OneTrust AutoBlocking script end for www-qua2.cp.pt -->\n  <!-- Global Site Tag (gtag.js) - Google Analytics -->\n  <script type=\"text/javascript\" src=\"/gtag_consents_default.js\"></script>\n  <script async src=\"https://www.googletagmanager.com/gtag/js?id=G-E5W1HWQ9XC\"></script>\n  <script async type=\"text/javascript\" src=\"/gtag_init.js\"></script>\n  <!-- fim GTAG -->\n  <!-- Google Tag Manager -->\n  <script>(function (w, d, s, l, i) {\n      w[l] = w[l] || []; w[l].push({\n        'gtm.start':\n\n          new Date().getTime(), event: 'gtm.js'\n      }); var f = d.getElementsByTagName(s)[0],\n\n        j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =\n\n          'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);\n\n    })(window, document, 'script', 'dataLayer', 'GTM-P966PFCT');</script>\n  <!-- End Google Tag Manager -->\n  <link rel=\"stylesheet\" type=\"tex",
+   "json": false
+  },
+  "cp_train": {
+   "url": "https://www.cp.pt/sites/spring/station/trains/train?trainId=831",
+   "status": 200,
+   "final_url": "https://www.cp.pt/sites/spring/station/trains/train?trainId=831",
+   "headers": {
+    "Server": "CP - Comboios de Portugal",
+    "Content-Length": "3306",
+    "X-Cache": "REVALIDATE from www.cp.pt",
+    "Content-Type": "text/html"
+   },
+   "bytes": 3306,
+   "head": "<!doctype html>\n<html lang=\"pt\">\n\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>CP - Comboios de Portugal</title>\n  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap\" rel=\"stylesheet\">\n  <!-- OneTrust AutoBlocking script start for www-qua2.cp.pt -->\n   <!-- (needs to be the first script in the <head> section!!!) -->\n  <script type=\"text/javascript\"\n    src=\"https://cdn.cookielaw.org/consent/0199707f-8a12-73a1-aec0-1c75f3a7a833/OtAutoBlock.js\"></script>\n  <!-- OneTrust AutoBlocking script end for www-qua2.cp.pt -->\n  <!-- Global Site Tag (gtag.js) - Google Analytics -->\n  <script type=\"text/javascript\" src=\"/gtag_consents_default.js\"></script>\n  <script async src=\"https://www.googletagmanager.com/gtag/js?id=G-E5W1HWQ9XC\"></script>\n  <script async type=\"text/javascript\" src=\"/gtag_init.js\"></script>\n  <!-- fim GTAG -->\n  <!-- Google Tag Manager -->\n  <script>(function (w, d, s, l, i) {\n      w[l] = w[l] || []; w[l].push({\n        'gtm.start':\n\n          new Date().getTime(), event: 'gtm.js'\n      }); var f = d.getElementsByTagName(s)[0],\n\n        j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =\n\n          'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);\n\n    })(window, document, 'script', 'dataLayer', 'GTM-P966PFCT');</script>\n  <!-- End Google Tag Manager -->\n  <link rel=\"stylesheet\" type=\"tex",
+   "json": false
+  },
+  "cp_home": {
+   "url": "https://www.cp.pt/",
+   "status": 200,
+   "final_url": "https://www.cp.pt/en",
+   "headers": {
+    "Server": "CP - Comboios de Portugal",
+    "Content-Type": "text/html",
+    "Content-Length": "3306",
+    "X-Cache": "MISS from www.cp.pt"
+   },
+   "bytes": 3306,
+   "head": "<!doctype html>\n<html lang=\"pt\">\n\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>CP - Comboios de Portugal</title>\n  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap\" rel=\"stylesheet\">\n  <!-- OneTrust AutoBlocking script start for www-qua2.cp.pt -->\n   <!-- (needs to be the first script in the <head> section!!!) -->\n  <script type=\"text/javascript\"\n    src=\"https://cdn.cookielaw.org/consent/0199707f-8a12-73a1-aec0-1c75f3a7a833/OtAutoBlock.js\"></script>\n  <!-- OneTrust AutoBlocking script end for www-qua2.cp.pt -->\n  <!-- Global Site Tag (gtag.js) - Google Analytics -->\n  <script type=\"text/javascript\" src=\"/gtag_consents_default.js\"></script>\n  <script async src=\"https://www.googletagmanager.com/gtag/js?id=G-E5W1HWQ9XC\"></script>\n  <script async type=\"text/javascript\" src=\"/gtag_init.js\"></script>\n  <!-- fim GTAG -->\n  <!-- Google Tag Manager -->\n  <script>(function (w, d, s, l, i) {\n      w[l] = w[l] || []; w[l].push({\n        'gtm.start':\n\n          new Date().getTime(), event: 'gtm.js'\n      }); var f = d.getElementsByTagName(s)[0],\n\n        j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =\n\n          'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);\n\n    })(window, document, 'script', 'dataLayer', 'GTM-P966PFCT');</script>\n  <!-- End Google Tag Manager -->\n  <link rel=\"stylesheet\" type=\"tex",
+   "json": false
+  },
+  "ip_station_search": {
+   "url": "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/estacao-nome/Aveiro",
+   "status": 200,
+   "final_url": "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/estacao-nome/Aveiro",
+   "headers": {
+    "Content-Length": "168",
+    "Content-Type": "application/json",
+    "Server": "nginx",
+    "X-Cache": "MISS, MISS, MISS, MISS"
+   },
+   "bytes": 168,
+   "head": "{\"response\":[{\"Distancia\":0,\"NodeID\":9435139,\"Nome\":\"TAVEIRO\"},{\"Distancia\":0,\"NodeID\":9438000,\"Nome\":\"AVEIRO\"},{\"Distancia\":0,\"NodeID\":9442002,\"Nome\":\"AVEIRO-VOUGA\"}]}",
+   "json": true,
+   "json_shape": [
+    "dict",
+    [
+     "response"
+    ]
+   ]
+  },
+  "ip_departures": {
+   "url": "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/partidas-chegadas/9438000/2026-11-06%2016%3A09/2026-11-06%2018%3A09/INTERNACIONAL%2C%20ALFA%2C%20IC%2C%20IR%2C%20REGIONAL%2C%20URB%7CSUBUR%2C%20ESPECIAL",
+   "status": 200,
+   "final_url": "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/partidas-chegadas/9438000/2026-11-06%2016%3A09/2026-11-06%2018%3A09/INTERNACIONAL%2C%20ALFA%2C%20IC%2C%20IR%2C%20REGIONAL%2C%20URB%7CSUBUR%2C%20ESPECIAL",
+   "headers": {
+    "Content-Type": "application/json",
+    "Server": "nginx",
+    "X-Cache": "MISS, MISS, MISS, MISS"
+   },
+   "bytes": 7677,
+   "head": "{\"response\":[{\"NodeID\":9438000,\"NodesComboioTabelsPartidasChegadas\":[{\"ComboioPassou\":false,\"DataHoraPartidaChegada\":\"16:15\",\"DataHoraPartidaChegada_ToOrderBy\":\"06-11-2026 16:15:00\",\"DataHoraPartidaChegada_ToOrderByi\":\"\\/Date(1793981700000+0000)\\/\",\"DataRealizacao\":\"06-11-2026\",\"EstacaoDestino\":9429157,\"EstacaoOrigem\":9430007,\"NComboio1\":133,\"NComboio2\":133,\"NomeEstacaoDestino\":\"BRAGA\",\"NomeEstacaoOrigem\":\"LISBOA-APOL\\u00d3NIA\",\"Observacoes\":\"Circula com atraso de 7 min.\",\"Operador\":\"CP LONGO CURSO\",\"TipoServico\":\"ALFA\"},{\"ComboioPassou\":false,\"DataHoraPartidaChegada\":\"16:23\",\"DataHoraPartidaChegada_ToOrderBy\":\"06-11-2026 16:23:00\",\"DataHoraPartidaChegada_ToOrderByi\":\"\\/Date(1793982180000+0000)\\/\",\"DataRealizacao\":\"06-11-2026\",\"EstacaoDestino\":9401008,\"EstacaoOrigem\":9438000,\"NComboio1\":15637,\"NComboio2\":15636,\"NomeEstacaoDestino\":\"PORTO-S\\u00c3O BENTO\",\"NomeEstacaoOrigem\":\"AVEIRO\",\"Observacoes\":\"\",\"Operador\":\"CP PORTO\",\"TipoServico\":\"URB|SUBUR\"},{\"ComboioPassou\":false,\"DataHoraPartidaChegada\":\"16:40\",\"DataHoraPartidaChegada_ToOrderBy\":\"06-11-2026 16:40:00\",\"DataHoraPartidaChegada_ToOrderByi\":\"\\/Date(1793983200000+0000)\\/\",\"DataRealizacao\":\"06-11-2026\",\"EstacaoDestino\":9436004,\"EstacaoOrigem\":9438000,\"NComboio1\":4674,\"NComboio2\":4674,\"NomeEstacaoDestino\":\"COIMBRA-B\",\"NomeEstacaoOrigem\":\"AVEIRO\",\"Observacoes\":\"\",\"Operador\":\"CP REGIONAL\",\"TipoServico\":\"REGIONAL\"},{\"ComboioPassou\":false,\"DataHoraPartidaChegada\":\"16:46\",\"DataHoraPartidaChegada_ToOrderBy\":\"06-11-2026 16:46:00\",\"Da",
+   "json": true,
+   "json_shape": [
+    "dict",
+    [
+     "response"
+    ]
+   ]
+  },
+  "ip_train": {
+   "url": "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/horarios-ncombio/831/2026-11-06",
+   "status": 200,
+   "final_url": "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/horarios-ncombio/831/2026-11-06",
+   "headers": {
+    "Content-Type": "application/json",
+    "Server": "nginx",
+    "X-Cache": "MISS, MISS, MISS, MISS"
+   },
+   "bytes": 3106,
+   "head": "{\"response\":{\"DataHoraDestino\":\"06\\/11\\/2026 10:58:00\",\"DataHoraOrigem\":\"06\\/11\\/2026 06:47:00\",\"Destino\":\"VALEN\\u00c7A\",\"DuracaoViagem\":\"04:11\",\"NodesPassagemComboio\":[{\"ComboioPassou\":true,\"HoraProgramada\":\"06:47\",\"NodeID\":9464113,\"NomeEstacao\":\"FIGUEIRA DA FOZ\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"07:06\",\"NodeID\":9435006,\"NomeEstacao\":\"ALFARELOS\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"07:21\",\"NodeID\":9436004,\"NomeEstacao\":\"COIMBRA-B\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"07:36\",\"NodeID\":9437002,\"NomeEstacao\":\"PAMPILHOSA\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"07:43\",\"NodeID\":9437051,\"NomeEstacao\":\"MEALHADA\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"08:05\",\"NodeID\":9438000,\"NomeEstacao\":\"AVEIRO\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"08:13\",\"NodeID\":9438158,\"NomeEstacao\":\"ESTARREJA\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"08:22\",\"NodeID\":9438299,\"NomeEstacao\":\"OVAR\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"08:32\",\"NodeID\":9439008,\"NomeEstacao\":\"ESPINHO\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"08:44\",\"NodeID\":9439164,\"NomeEstacao\":\"GAIA-DEVESAS\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"08:49\",\"NodeID\":9402006,\"NomeEstacao\":\"PORTO-CAMPANH\\u00c3\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"HoraProgramada\":\"09:01\",\"NodeID\":9404002,\"NomeEstacao\":\"ERMESINDE\",\"Observacoes\":\"\"},{\"ComboioPassou\":true,\"Hor",
+   "json": true,
+   "json_shape": [
+    "dict",
+    [
+     "response"
+    ]
+   ]
+  }
+ }
+}
