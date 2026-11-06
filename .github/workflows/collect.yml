@@ -24,8 +24,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Probe data sources (temporary diagnostic)
+        run: python collector/probe.py || true
+
       - name: Collect
-        run: python collector/collect.py
+        run: python collector/collect.py || true
 
       - name: Save data
         run: |
