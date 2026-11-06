@@ -1,5 +1,5 @@
 {
- "run": "2026-11-06T16:11",
+ "run": "2026-11-06T16:15",
  "campanha_full_day": {
   "rows": 40,
   "first": [
@@ -20,35 +20,35 @@
     "TipoServico": "URB|SUBUR"
    },
    {
-    "ComboioPassou": false,
-    "DataHoraPartidaChegada": "16:10",
-    "DataHoraPartidaChegada_ToOrderBy": "06-11-2026 16:10:00",
-    "DataHoraPartidaChegada_ToOrderByi": "/Date(1793981400000+0000)/",
+    "ComboioPassou": true,
+    "DataHoraPartidaChegada": "16:15",
+    "DataHoraPartidaChegada_ToOrderBy": "06-11-2026 16:15:00",
+    "DataHoraPartidaChegada_ToOrderByi": "/Date(1793981700000+0000)/",
     "DataRealizacao": "06-11-2026",
-    "EstacaoDestino": 9407005,
-    "EstacaoOrigem": 9402006,
-    "NComboio1": 855,
-    "NComboio2": 855,
-    "NomeEstacaoDestino": "VALENÇA",
-    "NomeEstacaoOrigem": "PORTO-CAMPANHÃ",
+    "EstacaoDestino": 9438299,
+    "EstacaoOrigem": 9421071,
+    "NComboio1": 15934,
+    "NComboio2": 15934,
+    "NomeEstacaoDestino": "OVAR",
+    "NomeEstacaoOrigem": "LEÇA DO BALIO",
     "Observacoes": "",
-    "Operador": "CP REGIONAL",
-    "TipoServico": "IR"
+    "Operador": "CP PORTO",
+    "TipoServico": "URB|SUBUR"
    }
   ],
   "last": [
    {
     "ComboioPassou": false,
-    "DataHoraPartidaChegada": "18:10",
-    "DataHoraPartidaChegada_ToOrderBy": "06-11-2026 18:10:00",
-    "DataHoraPartidaChegada_ToOrderByi": "/Date(1793988600000+0000)/",
+    "DataHoraPartidaChegada": "18:11",
+    "DataHoraPartidaChegada_ToOrderBy": "06-11-2026 18:11:00",
+    "DataHoraPartidaChegada_ToOrderByi": "/Date(1793988660000+0000)/",
     "DataRealizacao": "06-11-2026",
-    "EstacaoDestino": 9438000,
-    "EstacaoOrigem": 9401008,
-    "NComboio1": 15747,
-    "NComboio2": 15746,
-    "NomeEstacaoDestino": "AVEIRO",
-    "NomeEstacaoOrigem": "PORTO-SÃO BENTO",
+    "EstacaoDestino": 9401008,
+    "EstacaoOrigem": 9429157,
+    "NComboio1": 15238,
+    "NComboio2": 15238,
+    "NomeEstacaoDestino": "PORTO-SÃO BENTO",
+    "NomeEstacaoOrigem": "BRAGA",
     "Observacoes": "",
     "Operador": "CP PORTO",
     "TipoServico": "URB|SUBUR"
@@ -56,13 +56,15 @@
   ],
   "observacoes_values": [
    "",
+   "Circula com atraso de 10 min.",
    "Circula com atraso de 6 min.",
-   "Circula com atraso de 9 min."
+   "Circula com atraso de 8 min."
   ]
  },
  "oriente_window_rows": 11,
  "oriente_observacoes": [
   "",
+  "Circula com atraso de 8 min.",
   "Circula com atraso de 9 min."
  ],
  "details": [
@@ -158,6 +160,150 @@
      "Origem": "BRAGA",
      "SituacaoComboio": "Circula com atraso de 9 min.",
      "TipoServico": "ALFA"
+    }
+   }
+  },
+  {
+   "board_row": {
+    "ComboioPassou": false,
+    "DataHoraPartidaChegada": "16:45",
+    "DataHoraPartidaChegada_ToOrderBy": "06-11-2026 16:45:30",
+    "DataHoraPartidaChegada_ToOrderByi": "/Date(1793983530000+0000)/",
+    "DataRealizacao": "06-11-2026",
+    "EstacaoDestino": 9430007,
+    "EstacaoOrigem": 9433001,
+    "NComboio1": 16028,
+    "NComboio2": 16028,
+    "NomeEstacaoDestino": "LISBOA-APOLÓNIA",
+    "NomeEstacaoOrigem": "AZAMBUJA",
+    "Observacoes": "Circula com atraso de 8 min.",
+    "Operador": "CP LISBOA",
+    "TipoServico": "URB|SUBUR"
+   },
+   "detail": {
+    "response": {
+     "DataHoraDestino": "06/11/2026 16:55:00",
+     "DataHoraOrigem": "06/11/2026 16:05:00",
+     "Destino": "LISBOA-APOLÓNIA",
+     "DuracaoViagem": "00:50",
+     "NodesPassagemComboio": [
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "16:05",
+       "NodeID": 9433001,
+       "NomeEstacao": "AZAMBUJA",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:08",
+       "NodeID": 9431401,
+       "NomeEstacao": "ESPADANAL AZAMB.",
+       "Observacoes": "Hora Prevista:16:17"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:11",
+       "NodeID": 9431377,
+       "NomeEstacao": "V. NV. DA RAINHA",
+       "Observacoes": "Hora Prevista:16:20"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:15",
+       "NodeID": 9431336,
+       "NomeEstacao": "CARREGADO",
+       "Observacoes": "Hora Prevista:16:23"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:17",
+       "NodeID": 9431310,
+       "NomeEstacao": "CASTANH.RIBATEJO",
+       "Observacoes": "Hora Prevista:16:26"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:21",
+       "NodeID": 9431278,
+       "NomeEstacao": "VILA FR. DE XIRA",
+       "Observacoes": "Hora Prevista:16:29"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:24",
+       "NodeID": 9431237,
+       "NomeEstacao": "ALHANDRA",
+       "Observacoes": "Hora Prevista:16:33"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:28",
+       "NodeID": 9431187,
+       "NomeEstacao": "ALVERCA",
+       "Observacoes": "Hora Prevista:16:36"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:31",
+       "NodeID": 9431146,
+       "NomeEstacao": "PÓVOA",
+       "Observacoes": "Hora Prevista:16:40"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:34",
+       "NodeID": 9431112,
+       "NomeEstacao": "SANTA IRIA",
+       "Observacoes": "Hora Prevista:16:43"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:38",
+       "NodeID": 9431070,
+       "NomeEstacao": "BOBADELA",
+       "Observacoes": "Hora Prevista:16:46"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:40",
+       "NodeID": 9431062,
+       "NomeEstacao": "SACAVÉM",
+       "Observacoes": "Hora Prevista:16:49"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:43",
+       "NodeID": 9431047,
+       "NomeEstacao": "MOSCAVIDE",
+       "Observacoes": "Hora Prevista:16:51"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:45",
+       "NodeID": 9431039,
+       "NomeEstacao": "LISBOA-ORIENTE",
+       "Observacoes": "Hora Prevista:16:53"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:48",
+       "NodeID": 9431005,
+       "NomeEstacao": "BRAÇO DE PRATA",
+       "Observacoes": "Hora Prevista:16:57"
+      },
+      {
+       "ComboioPassou": false,
+       "HoraProgramada": "16:55",
+       "NodeID": 9430007,
+       "NomeEstacao": "LISBOA-APOLÓNIA",
+       "Observacoes": "Hora Prevista:17:03"
+      }
+     ],
+     "Operador": "CP LISBOA",
+     "Origem": "AZAMBUJA",
+     "SituacaoComboio": "Circula com atraso de 8 min.",
+     "TipoServico": "URB|SUBUR"
     }
    }
   },
@@ -322,95 +468,144 @@
   {
    "board_row": {
     "ComboioPassou": true,
-    "DataHoraPartidaChegada": "16:09",
-    "DataHoraPartidaChegada_ToOrderBy": "06-11-2026 16:09:30",
-    "DataHoraPartidaChegada_ToOrderByi": "/Date(1793981370000+0000)/",
+    "DataHoraPartidaChegada": "16:06",
+    "DataHoraPartidaChegada_ToOrderBy": "06-11-2026 16:06:30",
+    "DataHoraPartidaChegada_ToOrderByi": "/Date(1793981190000+0000)/",
     "DataRealizacao": "06-11-2026",
-    "EstacaoDestino": 9429157,
-    "EstacaoOrigem": 9430007,
-    "NComboio1": 135,
-    "NComboio2": 135,
-    "NomeEstacaoDestino": "BRAGA",
-    "NomeEstacaoOrigem": "LISBOA-APOLÓNIA",
+    "EstacaoDestino": 9430007,
+    "EstacaoOrigem": 9434009,
+    "NComboio1": 4424,
+    "NComboio2": 4424,
+    "NomeEstacaoDestino": "LISBOA-APOLÓNIA",
+    "NomeEstacaoOrigem": "ENTRONCAMENTO",
     "Observacoes": "",
-    "Operador": "CP LONGO CURSO",
-    "TipoServico": "ALFA"
+    "Operador": "CP REGIONAL",
+    "TipoServico": "REGIONAL"
    },
    "detail": {
     "response": {
-     "DataHoraDestino": "06/11/2026 19:29:00",
-     "DataHoraOrigem": "06/11/2026 16:00:00",
-     "Destino": "BRAGA",
-     "DuracaoViagem": "03:29",
+     "DataHoraDestino": "06/11/2026 16:13:00",
+     "DataHoraOrigem": "06/11/2026 14:36:00",
+     "Destino": "LISBOA-APOLÓNIA",
+     "DuracaoViagem": "01:37",
      "NodesPassagemComboio": [
       {
        "ComboioPassou": true,
-       "HoraProgramada": "16:00",
-       "NodeID": 9430007,
-       "NomeEstacao": "LISBOA-APOLÓNIA",
+       "HoraProgramada": "14:36",
+       "NodeID": 9434009,
+       "NomeEstacao": "ENTRONCAMENTO",
        "Observacoes": ""
       },
       {
        "ComboioPassou": true,
-       "HoraProgramada": "16:08",
+       "HoraProgramada": "14:42",
+       "NodeID": 9432466,
+       "NomeEstacao": "RIACHOS",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "14:48",
+       "NodeID": 9432383,
+       "NomeEstacao": "MATO MIRANDA",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "14:55",
+       "NodeID": 9432284,
+       "NomeEstacao": "VALE DE FIGUEIRA",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:01",
+       "NodeID": 9432185,
+       "NomeEstacao": "SANTARÉM",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:07",
+       "NodeID": 9432102,
+       "NomeEstacao": "VALE DE SANTARÉM",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:13",
+       "NodeID": 9432045,
+       "NomeEstacao": "SANTANA-CARTAXO",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:18",
+       "NodeID": 9432003,
+       "NomeEstacao": "SETIL",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:20",
+       "NodeID": 9433084,
+       "NomeEstacao": "REGUENGO",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:24",
+       "NodeID": 9433043,
+       "NomeEstacao": "VIRTUDES",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:28",
+       "NodeID": 9433001,
+       "NomeEstacao": "AZAMBUJA",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:46",
+       "NodeID": 9431278,
+       "NomeEstacao": "VILA FR. DE XIRA",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:53",
+       "NodeID": 9431187,
+       "NomeEstacao": "ALVERCA",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "15:57",
+       "NodeID": 9431146,
+       "NomeEstacao": "PÓVOA",
+       "Observacoes": ""
+      },
+      {
+       "ComboioPassou": true,
+       "HoraProgramada": "16:05",
        "NodeID": 9431039,
        "NomeEstacao": "LISBOA-ORIENTE",
        "Observacoes": ""
       },
       {
        "ComboioPassou": false,
-       "HoraProgramada": "17:45",
-       "NodeID": 9436004,
-       "NomeEstacao": "COIMBRA-B",
-       "Observacoes": ""
-      },
-      {
-       "ComboioPassou": false,
-       "HoraProgramada": "18:13",
-       "NodeID": 9438000,
-       "NomeEstacao": "AVEIRO",
-       "Observacoes": ""
-      },
-      {
-       "ComboioPassou": false,
-       "HoraProgramada": "18:42",
-       "NodeID": 9439164,
-       "NomeEstacao": "GAIA-DEVESAS",
-       "Observacoes": ""
-      },
-      {
-       "ComboioPassou": false,
-       "HoraProgramada": "18:48",
-       "NodeID": 9402006,
-       "NomeEstacao": "PORTO-CAMPANHÃ",
-       "Observacoes": ""
-      },
-      {
-       "ComboioPassou": false,
-       "HoraProgramada": "19:12",
-       "NodeID": 9405074,
-       "NomeEstacao": "FAMALICÃO",
-       "Observacoes": ""
-      },
-      {
-       "ComboioPassou": false,
-       "HoraProgramada": "19:17",
-       "NodeID": 9406007,
-       "NomeEstacao": "NINE",
-       "Observacoes": ""
-      },
-      {
-       "ComboioPassou": false,
-       "HoraProgramada": "19:29",
-       "NodeID": 9429157,
-       "NomeEstacao": "BRAGA",
+       "HoraProgramada": "16:13",
+       "NodeID": 9430007,
+       "NomeEstacao": "LISBOA-APOLÓNIA",
        "Observacoes": ""
       }
      ],
-     "Operador": "CP LONGO CURSO",
-     "Origem": "LISBOA-APOLÓNIA",
+     "Operador": "CP REGIONAL",
+     "Origem": "ENTRONCAMENTO",
      "SituacaoComboio": "",
-     "TipoServico": "ALFA"
+     "TipoServico": "REGIONAL"
     }
    }
   },
@@ -509,7 +704,7 @@
        "Observacoes": ""
       },
       {
-       "ComboioPassou": false,
+       "ComboioPassou": true,
        "HoraProgramada": "16:14",
        "NodeID": 9431005,
        "NomeEstacao": "BRAÇO DE PRATA",
