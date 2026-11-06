@@ -91,6 +91,8 @@ header { display: flex; flex-wrap: wrap; align-items: end; justify-content: spac
 .v-bad  { color: var(--panel); background: var(--bad); }
 .v-cx   { color: var(--bad);  border-color: var(--bad); background: transparent; }
 .v-na   { color: var(--muted); border-color: var(--rule); }
+.v-none { color: var(--muted); border: 1px dashed var(--rule); }
+.early { flex-basis: 100%; margin: 0; padding: 10px 14px; border-radius: 8px; background: var(--cobalt-soft); color: var(--ink); font-size: .88rem; }
 .dep-late { display: block; font: .72rem var(--mono); color: var(--muted); white-space: nowrap; }
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
 .seg button { border: 0; border-right: 1px solid var(--rule); background: var(--paper); padding: 6px 10px; cursor: pointer; font-family: var(--mono); font-size: .85rem; }
@@ -434,7 +436,7 @@ footer code { font-family: var(--mono); }
     const win = windowIdx(dates);
     const useSvc = !J && S.svc.size, N = J ? 0 : S.N;
     let list = rows.filter(r => !useSvc || S.svc.has(r.svc)).map(r => ({ ...r, s: stat(r.v, win) }))
-      .filter(r => r.s.runs > 0);
+      .filter(r => r.s.runs > 0 || S.view !== "network");
     const all = list.length;
     list = list.filter(r => r.s.perWeek >= N);
     const sort = S.sort || (S.view === "network" ? "perWeek" : "time");
@@ -450,14 +452,14 @@ footer code { font-family: var(--mono); }
       const pill = k => counts[k] ? ` <span class="verdict v-${k}">${counts[k]} ${(counts[k] === 1 ? VERDICT[k].one : VERDICT[k].many)}</span>` : "";
       sum.innerHTML = `<h2>${esc(title)}</h2>
         <p><b>${all}</b> direct train${all === 1 ? "" : "s"} a day, all services · ${span}</p>
-        <p class="tally">${pill("bad")}${pill("cx")}${pill("warn")}${pill("ok")}${pill("na")}</p>
+        <p class="tally">${pill("bad")}${pill("cx")}${pill("warn")}${pill("ok")}${pill("na")}${pill("none")}</p>${earlyNote()}
         <p style="flex-basis:100%">${esc(sub)} A train counts as late when it reaches ${esc(nm(S.to))} ${S.X}+ min behind schedule. <strong>Repeat offender</strong>: late on half its runs or more. <strong>Often late</strong>: 1 run in 5 or more.</p>`;
     } else {
       const plural = (S.N ? matched : all) === 1 ? "" : "s";
       const noun = "train" + (S.N ? "s" : plural);
       sum.innerHTML = `<h2>${esc(title)}</h2>
         <p>${S.N ? `<b>${matched}</b> of ${all} ${noun} are` : `<b>${all}</b> ${noun},`} ${S.N ? `late ${S.X}+ min at least ${S.N}× a week` : `<b>${runs ? Math.round(100 * late / runs) : 0}%</b> of runs late ${S.X}+ min`} · <b>${chronic}</b> late 3+ times a week · ${span}</p>
-        <p style="flex-basis:100%">${esc(sub)}</p>`;
+        <p style="flex-basis:100%">${esc(sub)}</p>${S.view === "station" ? earlyNote() : ""}`;
     }
 
     if (!list.length) { board.innerHTML = `<div class="empty">No train matches these filters. Try a lower threshold or “Any”.</div>`; return; }
@@ -503,10 +505,12 @@ footer code { font-family: var(--mono); }
     warn: { label: "Often late",      one: "often late",      many: "often late" },
     ok:   { label: "Usually on time", one: "usually on time", many: "usually on time" },
     na:   { label: "Not enough data", one: "with too little data", many: "with too little data" },
+    none: { label: "No data yet", one: "with no data yet", many: "with no data yet" },
   };
   function verdict(s) {
     let k = "ok";
-    if (s.runs < 4) k = "na";
+    if (s.runs === 0) k = "none";
+    else if (s.runs < 4) k = "na";
     else if (s.cx / s.runs >= 0.1) k = "cx";
     else if (s.share >= 0.5) k = "bad";
     else if (s.share >= 0.2) k = "warn";
@@ -533,6 +537,15 @@ footer code { font-family: var(--mono); }
     const t = RT.totals[n], tot = t ? t.match + t.worse + t.better : 0;
     if (!tot) return `<span class="rate-line">No rider ratings yet</span>`;
     return `<span class="rate-line"><b>${Math.round(100 * t.match / tot)}%</b> of ${tot} rider${tot === 1 ? "" : "s"} agree</span>`;
+  }
+
+  // Shown while the collector has only a few days behind it.
+  function earlyNote() {
+    if (IDX.demo) return "";
+    const days = IDX.dates.length;
+    if (days >= 14) return "";
+    const since = IDX.dates[0] ? fmtDate(IDX.dates[0]) : "today";
+    return `<p class="early"><b>Collecting since ${esc(since)}.</b> Every train is listed, and each one's record fills in as it runs. ${days < 3 ? "Most trains show “No data yet” for now." : ""} Verdicts and arrival times become reliable after about two weeks.</p>`;
   }
 
   // ---------- realistic arrival times ----------
@@ -659,6 +672,7 @@ footer code { font-family: var(--mono); }
 
   function depLate(r, win) {
     const m = stat(r.vd, win).med;
+    if (m == null) return "";
     return m ? `<span class="dep-late">leaves +${m}′ typ.</span>` : `<span class="dep-late">leaves on time</span>`;
   }
 

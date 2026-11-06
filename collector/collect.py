@@ -51,7 +51,7 @@ HUBS = [9431039, 9402006, 9469179, 9461002, 9436004, 9468007, 9473007, 9438000, 
 
 WINDOW_BACK, WINDOW_AHEAD = 40, 90   # minutes of board to read around "now"
 FINISH_GRACE = 120                   # after scheduled end + this, close the train anyway
-WORKERS = 6
+WORKERS = 8
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
@@ -171,7 +171,7 @@ def train(n: int, d: date):
     return r if isinstance(r, dict) and r.get("NodesPassagemComboio") else None
 
 
-def timetable(t: dict) -> dict:
+def parse_timetable(t: dict) -> dict:
     """Compact timetable: stops as [node, scheduled 'HH:MM'], minutes since service-day midnight."""
     stops, seq, off, prev = [], [], 0, None
     for s in t["NodesPassagemComboio"]:
@@ -189,12 +189,20 @@ def timetable(t: dict) -> dict:
 
 # ---------- main steps ----------
 
-def discover(now: datetime, catalog: dict, stations: dict) -> int:
-    """Read hub boards around now; add new (date, train) timetables to the catalog."""
+def discover(now: datetime, catalog: dict, stations: dict, timetable: dict) -> int:
+    """Read hub boards around now; add new (date, train) timetables to the catalog.
+    While the persistent timetable is incomplete, sweep the whole service day so every
+    train and station is selectable on the dashboard from the start."""
     t0, t1 = now - timedelta(minutes=WINDOW_BACK), now + timedelta(minutes=WINDOW_AHEAD)
+    sweep = len(timetable) < 1000
+    if sweep:
+        t0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        t1 = t0 + timedelta(hours=23, minutes=59)
     seen: set[tuple[str, int]] = set()
     with ThreadPoolExecutor(WORKERS) as ex:
-        for rows in ex.map(lambda h: board_all(h, t0, t1), HUBS):
+        windows = [(h, t0 + timedelta(hours=k), min(t1, t0 + timedelta(hours=k + 1)))
+                   for h in HUBS for k in range(int((t1 - t0).total_seconds() // 3600) + 1)]
+        for rows in ex.map(lambda w: board_all(*w), windows):
             for r in rows:
                 n = r.get("NComboio1")
                 try:
@@ -203,7 +211,8 @@ def discover(now: datetime, catalog: dict, stations: dict) -> int:
                     d = now.date().isoformat()
                 if isinstance(n, int):
                     seen.add((d, n))
-    new = [(d, n) for d, n in seen if str(n) not in catalog.get(d, {})]
+    new = [(d, n) for d, n in seen if str(n) not in catalog.get(d, {})
+           and not (sweep and str(n) in timetable and timetable[str(n)].get("seen") == d)]
     stats["board_trains"] = len(seen)
 
     def fetch(item):
@@ -214,10 +223,15 @@ def discover(now: datetime, catalog: dict, stations: dict) -> int:
         for (d, n), t in ex.map(fetch, new):
             if not t:
                 continue
-            tt = timetable(t)
+            tt = parse_timetable(t)
             if tt["start"] is None:
                 continue
-            catalog.setdefault(d, {})[str(n)] = tt
+            timetable[str(n)] = {**tt, "seen": d}
+            # Trains that already finished before tracking began go to the timetable only:
+            # their delays can no longer be read, so there is nothing to observe.
+            mid = datetime.fromisoformat(d).replace(tzinfo=TZ)
+            if mid + timedelta(minutes=tt["end"]) >= now - timedelta(minutes=5):
+                catalog.setdefault(d, {})[str(n)] = tt
             for s in t["NodesPassagemComboio"]:
                 stations.setdefault(str(s["NodeID"]), [nice(s.get("NomeEstacao", "")), None, None])
     return len(new)
@@ -253,6 +267,7 @@ def observe(now: datetime, catalog: dict, live: dict) -> dict:
                 if overdue:
                     finished[key] = ("UNRESOLVED" if st["polls"] else "NO_SERVICE", d, n, tt, st)
                 continue
+            first = st["polls"] == 0
             st["polls"] += 1
             sit = t.get("SituacaoComboio") or ""
             cur = delay_of(sit)
@@ -268,10 +283,10 @@ def observe(now: datetime, catalog: dict, live: dict) -> dict:
                 if x.get("ComboioPassou"):
                     if k not in st["passed"]:
                         st["passed"].append(k)
-                        # Passed since last look: keep the estimate made before it passed;
-                        # if we never had one, the train's current delay is the best guess.
-                        if k not in st["est"] and cur is not None:
-                            st["est"][k] = cur
+                        # Passed since our last look: keep the estimate made before it passed.
+                        # Already passed when we first saw the train: its delay is unknown.
+                        if first:
+                            st["est"].pop(k, None)
                     continue
                 prev = hm((re.search(r"Prevista:\s*(\d{1,2}:\d{2})", x.get("Observacoes") or "") or [None, None])[1])
                 sched = hm(x.get("HoraProgramada"))
@@ -296,6 +311,8 @@ def observe(now: datetime, catalog: dict, live: dict) -> dict:
         else:
             stops = [[code, hhmm, hhmm, (None if status == "CANCELLED" else st["est"].get(str(i)))]
                      for i, (code, hhmm) in enumerate(tt["stops"])]
+            if status != "CANCELLED" and all(x[3] is None for x in stops):
+                continue                   # seen only after it finished: nothing learned
             rec = {"n": int(n), "svc": tt["svc"], "st": status, "d": stops[-1][3] if stops else None,
                    "stops": stops, "polls": st["polls"], "t": now.strftime("%Y-%m-%dT%H:%M")}
         out.setdefault(d, []).append(rec)
@@ -340,20 +357,25 @@ def main():
     stations = load_json(DATA / "stations.json", {})
     stations = {k: v for k, v in stations.items() if "-" not in k}   # drop old CP-format codes
     live = load_json(DATA / "live.json", {})
+    timetable = load_json(DATA / "timetable.json", {})
 
     t0 = time.time()
-    new = discover(now, catalog, stations)
+    new = discover(now, catalog, stations, timetable)
     counts = observe(now, catalog, live)
     tidy(now, catalog, live)
     save_json(DATA / "catalog.json", catalog)
     save_json(DATA / "stations.json", stations)
     save_json(DATA / "live.json", live)
+    cutoff = (now.date() - timedelta(days=14)).isoformat()
+    timetable = {n: t for n, t in timetable.items() if t.get("seen", "") >= cutoff}
+    save_json(DATA / "timetable.json", timetable)
 
     health = {
         "source": "infraestruturasdeportugal.pt",
         "last_run": now.strftime("%Y-%m-%dT%H:%M"),
         "seconds": round(time.time() - t0, 1),
         "catalog_trains": sum(len(v) for v in catalog.values()),
+        "timetable_trains": len(timetable),
         "new_trains": new,
         "tracking": sum(1 for v in live.values() if not v.get("done")),
         "completed": counts["OK"], "cancelled": counts["CANCELLED"],

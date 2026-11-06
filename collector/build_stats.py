@@ -87,6 +87,24 @@ def main():
                 row.update(t=dep or arr, a=arr or dep, o=o, d=dst, last=(k == len(stops) - 1))
                 row["v"][i] = -1 if cancelled else (max(0, delay) if delay is not None else None)
 
+    # Every timetabled train appears, even before any delay is recorded for it.
+    timetable = {}
+    tp = DATA / "timetable.json"
+    if tp.exists():
+        timetable = json.loads(tp.read_text("utf-8"))
+    for n_s, tt in timetable.items():
+        n, stops = int(n_s), tt.get("stops") or []
+        if len(stops) < 2:
+            continue
+        o, dst = stops[0][0], stops[-1][0]
+        if n not in final:
+            final[n] = {"n": n, "svc": tt.get("svc", "?"), "o": o, "d": dst, "t0": stops[0][1],
+                        "t1": stops[-1][1], "p": [c for c, _ in stops], "v": [None] * D}
+        for k, (code, hhmm) in enumerate(stops):
+            if n not in st_rows[code]:
+                st_rows[code][n] = {"n": n, "svc": tt.get("svc", "?"), "o": o, "d": dst, "t": hhmm, "a": hhmm,
+                                    "last": k == len(stops) - 1, "v": [None] * D}
+
     iso = [d.isoformat() for d in dates]
     if OUT.exists():
         shutil.rmtree(OUT)
