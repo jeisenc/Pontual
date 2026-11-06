@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Diagnostic: records what CP's and IP's live-data endpoints actually return
-(status, content type, final URL, first bytes) into data/probe.json.
-Temporary — used to adapt the collector if CP's site changes.
+Diagnostic (temporary): samples Infraestruturas de Portugal's live data so the
+collector can be adapted to it. Writes data/probe.json.
 """
 import json
-import urllib.error
+import re
 import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,54 +13,52 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Lisbon")
 now = datetime.now(TZ)
-d0, d1 = now.strftime("%Y-%m-%d %H:%M"), (now + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
-types = "INTERNACIONAL, ALFA, IC, IR, REGIONAL, URB|SUBUR, ESPECIAL"
+BASE = "https://www.infraestruturasdeportugal.pt/negocios-e-servicos"
+TYPES = "INTERNACIONAL, ALFA, IC, IR, REGIONAL, URB|SUBUR, ESPECIAL"
+H = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+     "Accept": "application/json, text/plain, */*", "Referer": "https://www.infraestruturasdeportugal.pt/",
+     "X-Requested-With": "XMLHttpRequest"}
 
-UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-H_CP = {"User-Agent": UA, "Accept": "application/json, text/plain, */*", "Referer": "https://www.cp.pt/", "Origin": "https://www.cp.pt"}
-H_CP_MIN = {"User-Agent": "Chrome"}
-H_IP = {"User-Agent": UA, "Accept": "application/json, text/plain, */*", "Referer": "https://www.infraestruturasdeportugal.pt/",
-        "X-Requested-With": "XMLHttpRequest"}
 
-PROBES = [
-    ("cp_board", "https://www.cp.pt/sites/spring/station/trains?stationId=94-38000", H_CP),
-    ("cp_board_min_headers", "https://www.cp.pt/sites/spring/station/trains?stationId=94-38000", H_CP_MIN),
-    ("cp_train", "https://www.cp.pt/sites/spring/station/trains/train?trainId=831", H_CP),
-    ("cp_home", "https://www.cp.pt/", {"User-Agent": UA}),
-    ("ip_station_search", "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/estacao-nome/Aveiro", H_IP),
-    ("ip_departures", "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/partidas-chegadas/9438000/"
-        + quote(d0) + "/" + quote(d1) + "/" + quote(types), H_IP),
-    ("ip_train", "https://www.infraestruturasdeportugal.pt/negocios-e-servicos/horarios-ncombio/831/" + now.strftime("%Y-%m-%d"), H_IP),
-]
+def get(url):
+    with urllib.request.urlopen(urllib.request.Request(url, headers=H), timeout=30) as r:
+        return json.loads(r.read())
 
-out = {"run": now.strftime("%Y-%m-%dT%H:%M"), "results": {}}
-for name, url, headers in PROBES:
-    r = {"url": url}
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            body = resp.read()
-            r.update(status=resp.status, final_url=resp.geturl(),
-                     headers={k: v for k, v in resp.headers.items() if k.lower() in
-                              ("content-type", "server", "cf-ray", "location", "set-cookie", "x-cache", "content-length")})
-    except urllib.error.HTTPError as e:
-        body = e.read() or b""
-        r.update(status=e.code, final_url=url, headers={k: v for k, v in e.headers.items() if k.lower() in ("content-type", "server", "cf-ray")})
-    except Exception as e:
-        body = b""
-        r.update(error=repr(e)[:300])
-    text = body.decode("utf-8", "replace")
-    r["bytes"] = len(body)
-    r["head"] = text[:1500]
-    try:
-        j = json.loads(text)
-        r["json"] = True
-        r["json_shape"] = (type(j).__name__, list(j)[:15] if isinstance(j, dict) else len(j))
-    except Exception:
-        r["json"] = False
-    out["results"][name] = r
-    print(name, r.get("status"), r.get("headers", {}).get("Content-Type") or r.get("headers", {}).get("content-type"), r["bytes"], r.get("error", ""))
+
+def board(node, t0, t1):
+    return get(f"{BASE}/partidas-chegadas/{node}/{quote(t0.strftime('%Y-%m-%d %H:%M'))}/{quote(t1.strftime('%Y-%m-%d %H:%M'))}/{quote(TYPES)}")
+
+
+out = {"run": now.strftime("%Y-%m-%dT%H:%M")}
+
+# 1. A whole-day board at a hub: does a 24 h window work, and how many trains?
+try:
+    day0 = now.replace(hour=0, minute=0)
+    b = board(9402006, day0, day0 + timedelta(hours=23, minutes=59))
+    rows = b["response"][0]["NodesComboioTabelsPartidasChegadas"]
+    out["campanha_full_day"] = {"rows": len(rows), "first": rows[:2], "last": rows[-1:],
+                                "observacoes_values": sorted({r.get("Observacoes", "") for r in rows})[:40]}
+except Exception as e:
+    out["campanha_full_day"] = {"error": repr(e)[:300]}
+
+# 2. Trains running now: full detail for a handful, both late and on time.
+try:
+    b = board(9431039, now - timedelta(minutes=90), now + timedelta(minutes=30))   # Lisboa Oriente
+    rows = b["response"][0]["NodesComboioTabelsPartidasChegadas"]
+    late = [r for r in rows if "atraso" in (r.get("Observacoes") or "").lower()]
+    ontime = [r for r in rows if not r.get("Observacoes") and not r.get("ComboioPassou")]
+    passed = [r for r in rows if r.get("ComboioPassou")]
+    picks = late[:3] + ontime[:1] + passed[-2:]
+    out["oriente_window_rows"] = len(rows)
+    out["oriente_observacoes"] = sorted({r.get("Observacoes", "") for r in rows})
+    out["details"] = []
+    for r in picks:
+        n = r["NComboio1"]
+        d = get(f"{BASE}/horarios-ncombio/{n}/{now.strftime('%Y-%m-%d')}")
+        out["details"].append({"board_row": r, "detail": d})
+except Exception as e:
+    out["details_error"] = repr(e)[:300]
 
 p = Path(__file__).resolve().parent.parent / "data" / "probe.json"
-p.parent.mkdir(exist_ok=True)
 p.write_text(json.dumps(out, ensure_ascii=False, indent=1), "utf-8")
+print("probe written", {k: (v if not isinstance(v, (list, dict)) else len(v)) for k, v in out.items()})
