@@ -152,6 +152,19 @@ def board(node: int, t0: datetime, t1: datetime):
         return []
 
 
+BOARD_CAP = 40   # IP returns at most this many rows per board request
+
+
+def board_all(node: int, t0: datetime, t1: datetime, depth: int = 0):
+    """A board for [t0, t1], splitting the window when IP's row cap is hit."""
+    rows = board(node, t0, t1)
+    if len(rows) >= BOARD_CAP and depth < 4 and (t1 - t0) > timedelta(minutes=10):
+        mid = t0 + (t1 - t0) / 2
+        stats["board_splits"] += 1
+        return board_all(node, t0, mid, depth + 1) + board_all(node, mid, t1, depth + 1)
+    return rows
+
+
 def train(n: int, d: date):
     j = get_json(f"{BASE}/horarios-ncombio/{n}/{d.isoformat()}")
     r = (j or {}).get("response") if isinstance(j, dict) else None
@@ -181,7 +194,7 @@ def discover(now: datetime, catalog: dict, stations: dict) -> int:
     t0, t1 = now - timedelta(minutes=WINDOW_BACK), now + timedelta(minutes=WINDOW_AHEAD)
     seen: set[tuple[str, int]] = set()
     with ThreadPoolExecutor(WORKERS) as ex:
-        for rows in ex.map(lambda h: board(h, t0, t1), HUBS):
+        for rows in ex.map(lambda h: board_all(h, t0, t1), HUBS):
             for r in rows:
                 n = r.get("NComboio1")
                 try:
@@ -346,7 +359,7 @@ def main():
         "completed": counts["OK"], "cancelled": counts["CANCELLED"],
         "no_service": counts["NO_SERVICE"], "unresolved": counts["UNRESOLVED"],
         "unknown_status": dict(unknown_status.most_common(10)),
-        **{k: stats[k] for k in ("requests", "ok", "failed", "board_trains", "due")},
+        **{k: stats[k] for k in ("requests", "ok", "failed", "board_trains", "board_splits", "due")},
     }
     save_json(DATA / "health.json", health)
     (DATA / "probe.json").unlink(missing_ok=True)
