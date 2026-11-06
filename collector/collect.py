@@ -194,14 +194,19 @@ def discover(now: datetime, catalog: dict, stations: dict, timetable: dict) -> i
     While the persistent timetable is incomplete, sweep the whole service day so every
     train and station is selectable on the dashboard from the start."""
     t0, t1 = now - timedelta(minutes=WINDOW_BACK), now + timedelta(minutes=WINDOW_AHEAD)
+    windows = [(h, t0, t1) for h in HUBS]
     sweep = len(timetable) < 1000
     if sweep:
-        t0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        t1 = t0 + timedelta(hours=23, minutes=59)
+        # IP's boards only list trains still to come, so read the rest of today and the
+        # next three days (weekday and weekend services) in 3-hour slices.
+        start = now.replace(minute=0, second=0, microsecond=0)
+        end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=4)
+        k = start
+        while k < end:
+            windows += [(h, k, min(end, k + timedelta(hours=3)) - timedelta(minutes=1)) for h in HUBS]
+            k += timedelta(hours=3)
     seen: set[tuple[str, int]] = set()
     with ThreadPoolExecutor(WORKERS) as ex:
-        windows = [(h, t0 + timedelta(hours=k), min(t1, t0 + timedelta(hours=k + 1)))
-                   for h in HUBS for k in range(int((t1 - t0).total_seconds() // 3600) + 1)]
         for rows in ex.map(lambda w: board_all(*w), windows):
             for r in rows:
                 n = r.get("NComboio1")
@@ -211,8 +216,16 @@ def discover(now: datetime, catalog: dict, stations: dict, timetable: dict) -> i
                     d = now.date().isoformat()
                 if isinstance(n, int):
                     seen.add((d, n))
-    new = [(d, n) for d, n in seen if str(n) not in catalog.get(d, {})
-           and not (sweep and str(n) in timetable and timetable[str(n)].get("seen") == d)]
+    # Trains running today must be tracked; for future days we only need each train's
+    # timetable once (its earliest date), and only if we don't have it yet.
+    today = now.date().isoformat()
+    new, wanted = [], set()
+    for d, n in sorted(seen):
+        if d <= today:
+            if str(n) not in catalog.get(d, {}):
+                new.append((d, n)); wanted.add(n)
+        elif str(n) not in timetable and n not in wanted:
+            new.append((d, n)); wanted.add(n)
     stats["board_trains"] = len(seen)
 
     def fetch(item):
@@ -230,7 +243,7 @@ def discover(now: datetime, catalog: dict, stations: dict, timetable: dict) -> i
             # Trains that already finished before tracking began go to the timetable only:
             # their delays can no longer be read, so there is nothing to observe.
             mid = datetime.fromisoformat(d).replace(tzinfo=TZ)
-            if mid + timedelta(minutes=tt["end"]) >= now - timedelta(minutes=5):
+            if d <= today and mid + timedelta(minutes=tt["end"]) >= now - timedelta(minutes=5):
                 catalog.setdefault(d, {})[str(n)] = tt
             for s in t["NodesPassagemComboio"]:
                 stations.setdefault(str(s["NodeID"]), [nice(s.get("NomeEstacao", "")), None, None])
