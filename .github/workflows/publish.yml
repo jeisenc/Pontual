@@ -1,7 +1,11 @@
 name: Publish dashboard
 
-# Hourly: rebuild the statistics and redeploy the site to GitHub Pages.
+# After each collection run (and hourly as a fallback): rebuild the statistics
+# and redeploy the site to GitHub Pages.
 on:
+  workflow_run:
+    workflows: ["Collect delays"]
+    types: [completed]
   schedule:
     - cron: "41 * * * *"
   push:
