@@ -132,6 +132,17 @@ tr.row.dim td { color: var(--muted); }
 .wkdots.low i.on { background: var(--ok); }
 .rate-line { display: block; margin-top: 4px; font-size: .74rem; color: var(--muted); white-space: nowrap; }
 .rate-line b { color: var(--ink); font-weight: 600; }
+.plan-tag { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--cobalt); }
+.arr { grid-column: 1 / -1; display: grid; gap: 10px; }
+.arr h3 { margin: 0; }
+.arr-rows { display: grid; gap: 6px; max-width: 640px; }
+.arr-row { display: grid; grid-template-columns: 8.5em 4.2em minmax(60px, 1fr) auto; align-items: center; gap: 4px 12px; font-size: .9rem; }
+.arr-l { color: var(--muted); }
+.arr-t { font: 600 1.05rem var(--mono); }
+.arr-bar { height: 8px; background: var(--empty); border-radius: 4px; overflow: hidden; }
+.arr-bar i { display: block; height: 100%; border-radius: 4px; }
+.arr-n { font: .78rem var(--mono); color: var(--muted); white-space: nowrap; }
+@media (max-width: 560px) { .arr-row { grid-template-columns: 7.5em 4em minmax(40px, 1fr); } .arr-n { grid-column: 2 / -1; white-space: normal; } }
 .rate { grid-column: 1 / -1; display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 16px; }
 .rate h3 { margin: 0; }
 .rate-btns { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -204,7 +215,7 @@ footer code { font-family: var(--mono); }
   <header>
     <div class="brand">
       <h1>Pontual<span>.</span></h1>
-      <p>How often each CP train actually runs late, measured day by day from CP's live service data.</p>
+      <p>How often each CP train actually runs late, measured day by day from the railway's live train data.</p>
     </div>
     <div class="views" role="group" aria-label="View">
       <button id="v-journey" aria-pressed="true">Journey</button>
@@ -240,6 +251,10 @@ footer code { font-family: var(--mono); }
     <div class="field">
       <span class="lbl">Late means at least</span>
       <div class="seg" id="seg-x"></div>
+    </div>
+    <div class="field" id="f-plan">
+      <span class="lbl">Show arrival times for</span>
+      <div class="seg" id="seg-p"></div>
     </div>
     <div class="field" id="f-n">
       <span class="lbl">Show trains late this often</span>
@@ -282,6 +297,7 @@ footer code { font-family: var(--mono); }
     X: store.get("X", 5),
     N: store.get("N", 0),
     weeks: store.get("weeks", 4),
+    plan: store.get("plan", "p50"),
     days: store.get("days", "all"),
     svc: new Set(store.get("svc", [])),
     sort: null,
@@ -310,7 +326,8 @@ footer code { font-family: var(--mono); }
     return { runs: obs.length + cx, obs: obs.length, late, cx,
       perWeek: win.weeks ? late / win.weeks : 0,
       share: obs.length ? late / obs.length : 0,
-      med: pct(obs, .5), p90: pct(obs, .9) };
+      med: pct(obs, .5), p90: pct(obs, .9), p95: pct(obs, .95), max: obs.length ? Math.max(...obs) : null,
+      onTime: obs.length ? obs.filter(x => x <= 1).length / obs.length : null };
   }
   const tone = d => d == null ? "" : d < 0 ? "c-x" : d < S.X ? "c-ok" : d < Math.max(15, S.X * 2) ? "c-warn" : "c-bad";
   const ttone = d => d == null ? "" : d < S.X ? "t-ok" : d < Math.max(15, S.X * 2) ? "t-warn" : "t-bad";
@@ -330,6 +347,7 @@ footer code { font-family: var(--mono); }
     seg($("#seg-n"), [[0, "Any"], [1, "1+/wk"], [2, "2+"], [3, "3+"], [5, "5+"]], "N");
     seg($("#seg-w"), [[2, "2 wks"], [4, "4"], [8, "8"], [12, "12"]], "weeks");
     seg($("#seg-d"), [["all", "All"], ["wk", "Mon–Fri"], ["we", "Weekend"]], "days");
+    seg($("#seg-p"), PLANS.map(p => [p.k, p.label]), "plan");
     const sv = $("#svc"); sv.innerHTML = "";
     const present = new Set((IDX?.trains || []).map(t => t.svc));
     for (const c of SVC_ORDER.filter(c => present.has(c))) {
@@ -343,6 +361,7 @@ footer code { font-family: var(--mono); }
     $("#f-station").hidden = S.view !== "station";
     // A journey always lists every direct train, whatever the service.
     $("#f-n").hidden = $("#f-svc").hidden = S.view === "journey";
+    $("#f-plan").hidden = S.view !== "journey";
     if (IDX) {
       const n = c => (IDX.stations.find(s => s.code === c) || {}).name || "";
       for (const [id, key] of [["from", "from"], ["to", "to"], ["station", "code"]]) {
@@ -445,7 +464,7 @@ footer code { font-family: var(--mono); }
     const showDays = Math.min(win.idx.length, 28), stripIdx = win.idx.slice(-showDays);
     const th = (k, label, cls = "") => k ? `<th class="${cls}"><button data-sort="${k}" ${sort === k ? 'aria-sort="descending"' : ""}>${label}</button></th>` : `<th class="${cls}">${label}</th>`;
     let h = `<table class="${J ? "jt" : ""}"><thead><tr>
-      ${J ? th("time", `Leaves ${esc(nm(S.from))}`) + th(null, `Reaches ${esc(nm(S.to))}`) + th(null, "Train") + th(null, "Verdict")
+      ${J ? th("time", `Leaves ${esc(nm(S.from))}`) + th(null, `Reaches ${esc(nm(S.to))}${S.plan !== "sched" ? ` <span class=\"plan-tag\">${esc(PLANS.find(p => p.k === S.plan).short)}</span>` : ""}`) + th(null, "Train") + th(null, "Verdict")
           : th("time", S.view === "station" ? "Time" : "Departs") + th(null, "Train") + th(null, "Route")}
       ${th("perWeek", `Late ${S.X}+ min`, "num")}${th("share", J ? `Chance ${S.X}+ late` : "Of runs", "num")}
       ${th("med", "Typical", "num")}${th("p90", "Bad day", "num")}${th("cx", "Cancelled", "num")}
@@ -454,7 +473,7 @@ footer code { font-family: var(--mono); }
       const s = r.s, few = s.obs < 4, id = r.n + "@" + (r.t || "");
       h += `<tr class="row${few ? " dim" : ""}" data-id="${esc(id)}" tabindex="0" aria-expanded="${S.open === id}">
         <td class="time c-lv">${esc(r.t || "–")}${J ? depLate(r, win) : ""}</td>
-        ${J ? `<td class="time c-rc">${esc(r.a || "–")}<span class="dep-late">${Math.floor(r.dur / 60)}h${String(r.dur % 60).padStart(2, "0")}</span></td>` : ""}
+        ${J ? arriveCell(r, s) : ""}
         ${J ? `<td class="c-tr"><span class="train"><span class="svc ${esc(r.svc)}">${esc(r.svc)}</span><span class="svc-name">${esc(IDX.services[r.svc] || r.svc)}</span> ${r.n}</span>
                 <span class="runs">runs ${esc(nm(r.o))} → ${esc(nm(r.d))}</span></td>
               <td class="c-vd">${(v => `<span class="verdict v-${v.k}">${v.label}</span>`)(verdict(s))}${ratingLine(r.n)}</td>`
@@ -514,6 +533,45 @@ footer code { font-family: var(--mono); }
     const t = RT.totals[n], tot = t ? t.match + t.worse + t.better : 0;
     if (!tot) return `<span class="rate-line">No rider ratings yet</span>`;
     return `<span class="rate-line"><b>${Math.round(100 * t.match / tot)}%</b> of ${tot} rider${tot === 1 ? "" : "s"} agree</span>`;
+  }
+
+  // ---------- realistic arrival times ----------
+  const PLANS = [
+    { k: "sched", label: "Timetable",     short: "timetable",     q: null },
+    { k: "p50",   label: "Most days",     short: "most days",     q: "med" },
+    { k: "p90",   label: "9 days in 10",  short: "9 days in 10",  q: "p90" },
+    { k: "p95",   label: "Almost always", short: "almost always", q: "p95" },
+  ];
+  const addMin = (t, d) => { const m = hm(t); return m == null ? "–" : `${String(Math.floor(((m + d) % 1440) / 60)).padStart(2, "0")}:${String((m + d) % 60).padStart(2, "0")}`; };
+  function arriveCell(r, s) {
+    const p = PLANS.find(x => x.k === S.plan) || PLANS[1];
+    const d = p.q ? s[p.q] : 0;
+    const dur = `${Math.floor(r.dur / 60)}h${String(r.dur % 60).padStart(2, "0")}`;
+    if (!p.q || d == null) return `<td class="time c-rc">${esc(r.a || "–")}<span class="dep-late">${dur}</span></td>`;
+    const shifted = d > 0;
+    return `<td class="time c-rc"><span class="${shifted ? ttone(d) : ""}">${esc(addMin(r.a, d))}</span><span class="dep-late">${shifted ? `timetable ${esc(r.a)}` : "as timetabled"}</span></td>`;
+  }
+  function arrivalBlock(r, win) {
+    if (S.view !== "journey") return "";
+    const s = stat(r.v, win);
+    if (!s.obs) return "";
+    const rows = [
+      ["Timetable", r.a, s.onTime != null ? `arrives on time ${Math.round(100 * s.onTime)}% of days` : "", 0],
+      ["Most days", addMin(r.a, s.med), "half of arrivals are by this time", s.med],
+      ["9 days in 10", addMin(r.a, s.p90), "", s.p90],
+      ["Almost always", addMin(r.a, s.p95), "19 days in 20", s.p95],
+      ["Latest seen", addMin(r.a, s.max), `in the last ${S.weeks} weeks`, s.max],
+    ];
+    const top = Math.max(5, s.max || 0);
+    return `<div class="arr">
+      <h3>When you'll actually reach ${esc(nm(S.to))}</h3>
+      <div class="arr-rows">${rows.map(([l, t, note, d]) => `
+        <div class="arr-row"><span class="arr-l">${l}</span><b class="arr-t ${d ? ttone(d) : ""}">${esc(t)}</b>
+          <span class="arr-bar" aria-hidden="true"><i style="width:${Math.max(2, 100 * (d || 0) / top)}%;background:${d ? (d >= Math.max(15, S.X * 2) ? "var(--bad)" : d >= S.X ? "var(--warn)" : "var(--ok)") : "var(--ok)"}"></i></span>
+          <span class="arr-n">${l === "Timetable" ? esc(note) : (d ? `+${d} min` : "on time") + (note ? ` · ${esc(note)}` : "")}</span></div>`).join("")}
+      </div>
+      ${s.cx ? `<p class="rate-note">Cancelled ${s.cx} time${s.cx === 1 ? "" : "s"} in this period, not counted above.</p>` : ""}
+    </div>`;
   }
 
   function rateBlock(r) {
@@ -622,7 +680,7 @@ footer code { font-family: var(--mono); }
     const lead = (new Date(dates[first] + "T12:00:00Z").getUTCDay() + 6) % 7;
     let cells = "<i style='visibility:hidden'></i>".repeat(lead);
     for (let i = first; i < dates.length; i++) cells += `<i class="${tone(r.v[i])}" title="${dates[i]}: ${lbl(r.v[i])}"></i>`;
-    return `<div class="det">
+    return `<div class="det">${arrivalBlock(r, win)}
       <div><h3>Share of runs late ${S.X}+ min, by weekday</h3><div class="wk">${bars}</div></div>
       <div><h3>Every day in the period</h3>
         <div class="cal-days">${names.map(n => `<span>${n[0]}</span>`).join("")}</div>
