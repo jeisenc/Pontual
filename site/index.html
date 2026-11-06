@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pontual</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one working column — controls rail on top, then a departures-board table with expandable rows. */
+:root {
+  --paper: #f3f5f8;      /* cool off-white, biased toward the cobalt */
+  --panel: #ffffff;
+  --ink: #14213a;
+  --muted: #5b6780;
+  --rule: #d9dfe9;
+  --cobalt: #1f4fb4;     /* azulejo blue */
+  --cobalt-soft: #e3eafb;
+  --ok: #3f8f6b;
+  --warn: #c98a12;
+  --bad: #c43d32;
+  --cancel: #14213a;
+  --empty: #e7ebf2;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0d1526; --panel: #141e33; --ink: #e6ebf5; --muted: #95a1ba; --rule: #26334d;
+  --cobalt: #7ea2ff; --cobalt-soft: #1c2a4c; --ok: #5bbf92; --warn: #e3a93a; --bad: #ef6b5f;
+  --cancel: #e6ebf5; --empty: #1e2a42; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #0d1526; --panel: #141e33; --ink: #e6ebf5; --muted: #95a1ba; --rule: #26334d;
+  --cobalt: #7ea2ff; --cobalt-soft: #1c2a4c; --ok: #5bbf92; --warn: #e3a93a; --bad: #ef6b5f;
+  --cancel: #e6ebf5; --empty: #1e2a42; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 48px; display: grid; gap: 22px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.brand { display: grid; gap: 2px; }
+.brand h1 { margin: 0; font: 700 2.6rem/1 var(--display); letter-spacing: .01em; }
+.brand h1 span { color: var(--cobalt); }
+.brand p { margin: 0; color: var(--muted); max-width: 60ch; }
+.views { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 3px; }
+.views button { border: 0; background: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; }
+.views button[aria-pressed="true"] { background: var(--cobalt); color: var(--panel); }
+
+.demo { border: 1px dashed var(--warn); color: var(--ink); background: color-mix(in srgb, var(--warn) 10%, var(--panel));
+  padding: 10px 14px; border-radius: 8px; font-size: .9rem; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; background: var(--panel);
+  border: 1px solid var(--rule); border-radius: 10px; padding: 16px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > label, .field > .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.station-in { width: min(320px, 100%); padding: 8px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); }
+.combo { position: relative; width: min(320px, 100%); }
+.journey .combo { width: min(260px, 100%); }
+.combo .station-in { width: 100%; padding-right: 30px; }
+.combo .tick { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--ok); font-weight: 700; display: none; pointer-events: none; }
+.combo.ok .tick { display: block; }
+.combo.ok .station-in { border-color: color-mix(in srgb, var(--ok) 60%, var(--rule)); }
+.combo.bad .station-in { border-color: var(--bad); }
+.sugg { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 10px 28px rgba(15, 25, 50, .16);
+  max-height: 320px; overflow-y: auto; min-width: 240px; }
+.sugg li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.sugg li[aria-selected="true"] { background: var(--cobalt-soft); }
+.sugg li .nm { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.sugg li .nm mark { background: none; color: var(--cobalt); font-weight: 700; }
+.sugg li .hint { font: .74rem var(--mono); color: var(--muted); white-space: nowrap; }
+.sugg li.far .nm { color: var(--muted); }
+.sugg .head { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; padding: 8px 10px 4px; cursor: default; }
+.sugg .none { color: var(--muted); cursor: default; display: block; }
+.field-hint { font-size: .75rem; color: var(--muted); min-height: 1em; }
+.field-hint.err { color: var(--bad); }
+.journey { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.swap { border: 1px solid var(--rule); background: var(--paper); border-radius: 6px; width: 38px; height: 38px; cursor: pointer; font-size: 1.1rem; color: var(--cobalt); }
+.swap:hover { background: var(--cobalt-soft); }
+.svc-name { font-family: var(--body); font-weight: 500; }
+.runs { display: block; font-size: .75rem; color: var(--muted); white-space: nowrap; }
+.verdict, .pill { display: inline-block; font: 600 .74rem var(--body); padding: 3px 9px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
+.v-ok   { color: var(--ok);   background: color-mix(in srgb, var(--ok) 13%, transparent); }
+.v-warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+.v-bad  { color: var(--panel); background: var(--bad); }
+.v-cx   { color: var(--bad);  border-color: var(--bad); background: transparent; }
+.v-na   { color: var(--muted); border-color: var(--rule); }
+.dep-late { display: block; font: .72rem var(--mono); color: var(--muted); white-space: nowrap; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-right: 1px solid var(--rule); background: var(--paper); padding: 6px 10px; cursor: pointer; font-family: var(--mono); font-size: .85rem; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--cobalt-soft); color: var(--cobalt); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--rule); background: var(--paper); border-radius: 999px; padding: 3px 10px; cursor: pointer; font-size: .82rem; }
+.chip[aria-pressed="true"] { border-color: var(--cobalt); color: var(--cobalt); background: var(--cobalt-soft); }
+
+.summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.summary h2 { margin: 0; font: 700 2rem/1.1 var(--display); text-wrap: balance; }
+.summary p { margin: 0; color: var(--muted); }
+.summary b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+
+.board { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 760px; }
+th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600;
+  padding: 12px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th button { all: unset; cursor: pointer; }
+th button[aria-sort]::after { content: " ↓"; color: var(--cobalt); }
+th.num, td.num { text-align: right; }
+td { padding: 10px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+tr.row { cursor: pointer; }
+tr.row:hover td { background: color-mix(in srgb, var(--cobalt-soft) 45%, transparent); }
+tr.row.dim td { color: var(--muted); }
+.time { font: 600 1rem var(--mono); }
+.train { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: var(--mono); }
+.svc { font: 600 .7rem var(--mono); padding: 2px 6px; border-radius: 4px; border: 1px solid currentColor; color: var(--cobalt); letter-spacing: .04em; }
+.svc.U, .svc.R { color: var(--muted); }
+.route { font-family: var(--display); font-size: 1.05rem; font-weight: 500; }
+.route .arrow { color: var(--muted); padding: 0 4px; }
+.freq { display: inline-grid; gap: 4px; justify-items: end; white-space: nowrap; }
+.freq-t { font-size: .9rem; }
+.freq-t b { font: 600 1rem var(--mono); }
+.wkdots { display: flex; gap: 2px; }
+.wkdots i { width: 9px; height: 9px; border-radius: 2px; background: var(--empty); }
+.wkdots i.on { background: var(--bad); }
+.wkdots.mid i.on { background: var(--warn); }
+.wkdots.low i.on { background: var(--ok); }
+.rate-line { display: block; margin-top: 4px; font-size: .74rem; color: var(--muted); white-space: nowrap; }
+.rate-line b { color: var(--ink); font-weight: 600; }
+.rate { grid-column: 1 / -1; display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 16px; }
+.rate h3 { margin: 0; }
+.rate-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.rate-btns button { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 500; }
+.rate-btns button:hover { border-color: var(--cobalt); }
+.rate-btns button[aria-pressed="true"] { background: var(--cobalt); border-color: var(--cobalt); color: var(--panel); }
+.rate-btns button:disabled { opacity: .5; cursor: default; }
+.rate-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--empty); max-width: 420px; }
+.rate-bar i { display: block; height: 100%; }
+.rate-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--muted); }
+.rate-key span { display: inline-flex; align-items: center; gap: 6px; }
+.rate-key i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.rate-note { font-size: .8rem; color: var(--muted); margin: 0; }
+.mins { font-family: var(--mono); }
+.pill { font: 600 .72rem var(--mono); padding: 2px 7px; border-radius: 999px; }
+.strip { display: flex; gap: 2px; }
+.strip i { width: 6px; height: 16px; border-radius: 2px; background: var(--empty); flex: none; }
+.c-ok { background: var(--ok) !important; } .c-warn { background: var(--warn) !important; } .c-bad { background: var(--bad) !important; }
+.c-x { background: repeating-linear-gradient(135deg, var(--cancel) 0 2px, transparent 2px 4px) !important; }
+.t-ok { color: var(--ok); } .t-warn { color: var(--warn); } .t-bad { color: var(--bad); }
+
+tr.detail td { background: var(--paper); padding: 16px 18px 20px; }
+.det { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 24px; }
+.det h3 { margin: 0 0 10px; font: 600 1.1rem var(--display); letter-spacing: .02em; }
+.wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; }
+.wk div { display: grid; gap: 4px; justify-items: center; font-size: .75rem; color: var(--muted); }
+.wk .bar { width: 100%; max-width: 28px; height: 70px; background: var(--empty); border-radius: 4px; display: flex; align-items: flex-end; overflow: hidden; }
+.wk .bar i { display: block; width: 100%; }
+.wk b { font: 500 .75rem var(--mono); color: var(--ink); }
+.cal { display: grid; grid-template-columns: repeat(7, 18px); gap: 3px; }
+.cal i { width: 18px; height: 18px; border-radius: 3px; background: var(--empty); }
+.cal-wrap { display: flex; gap: 10px; align-items: flex-start; }
+.cal-days { display: grid; grid-template-rows: none; grid-template-columns: repeat(7, 18px); gap: 3px; font: .65rem var(--mono); color: var(--muted); text-align: center; margin-bottom: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8rem; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; background: var(--empty); display: inline-block; }
+
+.empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+footer { color: var(--muted); font-size: .82rem; display: grid; gap: 4px; }
+footer code { font-family: var(--mono); }
+
+@media (max-width: 720px) {
+  .brand h1 { font-size: 2.1rem; }
+  .det { grid-template-columns: minmax(0, 1fr); }
+  .summary h2 { font-size: 1.6rem; }
+}
+.tally { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 720px) {
+  table.jt { min-width: 0; }
+  table.jt thead { display: none; }
+  table.jt tr.row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; padding: 14px 14px 12px; border-bottom: 1px solid var(--rule); align-items: start;
+    grid-template-areas: "lv rc vd" "tr tr tr" "ch ty bd" "st st st"; }
+  table.jt tr.row td { border: 0; padding: 0; background: none; }
+  table.jt .c-lv { grid-area: lv; } table.jt .c-rc { grid-area: rc; } table.jt .c-vd { grid-area: vd; justify-self: end; }
+  table.jt .c-tr { grid-area: tr; } table.jt .c-ch { grid-area: ch; } table.jt .c-ty { grid-area: ty; } table.jt .c-bd { grid-area: bd; }
+  table.jt .runs { white-space: normal; }
+  table.jt .c-ch, table.jt .c-cx { display: none; }
+  table.jt .c-pw { grid-area: ch; text-align: left; } table.jt .c-pw .freq { justify-items: start; }
+  table.jt .c-pw, table.jt .c-ty, table.jt .c-bd { text-align: left; font-size: .9rem; }
+  table.jt .c-pw::before, table.jt .c-ty::before, table.jt .c-bd::before { content: attr(data-l); display: block; font: 600 .66rem var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  table.jt .c-st { grid-area: st; }
+  table.jt .strip { flex-wrap: wrap; }
+  table.jt tr.detail, table.jt tr.detail td { display: block; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Pontual<span>.</span></h1>
+      <p>How often each CP train actually runs late, measured day by day from CP's live service data.</p>
+    </div>
+    <div class="views" role="group" aria-label="View">
+      <button id="v-journey" aria-pressed="true">Journey</button>
+      <button id="v-station" aria-pressed="false">By station</button>
+      <button id="v-network" aria-pressed="false">Worst trains</button>
+    </div>
+  </header>
+
+  <div class="demo" id="demo" hidden><b>Demo data.</b> These delays are simulated on CP's real timetable to show how the dashboard works. Real figures appear once the collector has been running for a few weeks.</div>
+
+  <section class="controls" aria-label="Filters">
+    <div class="journey" id="f-journey">
+      <div class="field">
+        <label for="from">From</label>
+        <div class="combo"><input id="from" class="station-in" placeholder="Leaving from" autocomplete="off" autocapitalize="words" spellcheck="false"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="from-list"><span class="tick" aria-hidden="true">✓</span>
+          <ul class="sugg" id="from-list" role="listbox" aria-label="Stations to leave from" hidden></ul></div>
+      </div>
+      <button class="swap" id="swap" type="button" aria-label="Swap origin and destination" title="Swap">⇄</button>
+      <div class="field">
+        <label for="to">To</label>
+        <div class="combo"><input id="to" class="station-in" placeholder="Going to" autocomplete="off" autocapitalize="words" spellcheck="false"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="to-list"><span class="tick" aria-hidden="true">✓</span>
+          <ul class="sugg" id="to-list" role="listbox" aria-label="Stations to go to" hidden></ul></div>
+      </div>
+    </div>
+    <div class="field" id="f-station">
+      <label for="station">Station</label>
+      <div class="combo"><input id="station" class="station-in" placeholder="Type a station name" autocomplete="off" autocapitalize="words" spellcheck="false"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="station-list"><span class="tick" aria-hidden="true">✓</span>
+          <ul class="sugg" id="station-list" role="listbox" aria-label="Stations" hidden></ul></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Late means at least</span>
+      <div class="seg" id="seg-x"></div>
+    </div>
+    <div class="field" id="f-n">
+      <span class="lbl">Show trains late this often</span>
+      <div class="seg" id="seg-n"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Period</span>
+      <div class="seg" id="seg-w"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Days</span>
+      <div class="seg" id="seg-d"></div>
+    </div>
+    <div class="field" id="f-svc">
+      <span class="lbl">Service</span>
+      <div class="chips" id="svc"></div>
+    </div>
+  </section>
+
+  <section class="summary" id="summary" aria-live="polite"></section>
+
+  <section class="board" id="board"></section>
+
+  <footer id="foot"></footer>
+</div>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("pontual." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("pontual." + k, JSON.stringify(v)); } catch {} }
+  };
+  const S = {
+    view: "journey",
+    code: store.get("code", null),
+    from: store.get("from", null),
+    to: store.get("to", null),
+    X: store.get("X", 5),
+    N: store.get("N", 0),
+    weeks: store.get("weeks", 4),
+    days: store.get("days", "all"),
+    svc: new Set(store.get("svc", [])),
+    sort: null,
+    open: null,
+  };
+  let IDX = null; const ST = {};
+  const SVC_ORDER = ["AP", "IC", "IN", "IR", "R", "U"];
+
+  // ---------- stats ----------
+  const pct = (a, q) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * (s.length - 1) + 0.5))]; };
+  function windowIdx(dates) {
+    const n = Math.min(dates.length, S.weeks * 7), out = [];
+    for (let i = dates.length - n; i < dates.length; i++) {
+      const wd = new Date(dates[i] + "T12:00:00Z").getUTCDay(); // 0 Sun
+      const weekend = wd === 0 || wd === 6;
+      if (S.days === "wk" && weekend) continue;
+      if (S.days === "we" && !weekend) continue;
+      out.push(i);
+    }
+    return { idx: out, weeks: n / 7 };
+  }
+  function stat(v, win) {
+    const obs = []; let cx = 0;
+    for (const i of win.idx) { const x = v[i]; if (x == null) continue; if (x < 0) cx++; else obs.push(x); }
+    const late = obs.filter(x => x >= S.X).length;
+    return { runs: obs.length + cx, obs: obs.length, late, cx,
+      perWeek: win.weeks ? late / win.weeks : 0,
+      share: obs.length ? late / obs.length : 0,
+      med: pct(obs, .5), p90: pct(obs, .9) };
+  }
+  const tone = d => d == null ? "" : d < 0 ? "c-x" : d < S.X ? "c-ok" : d < Math.max(15, S.X * 2) ? "c-warn" : "c-bad";
+  const ttone = d => d == null ? "" : d < S.X ? "t-ok" : d < Math.max(15, S.X * 2) ? "t-warn" : "t-bad";
+
+  // ---------- controls ----------
+  function seg(el, opts, key, fmt) {
+    el.innerHTML = "";
+    for (const [val, label] of opts) {
+      const b = document.createElement("button");
+      b.textContent = label; b.setAttribute("aria-pressed", String(S[key] === val));
+      b.onclick = () => { S[key] = val; store.set(key, val); renderControls(); render(); };
+      el.append(b);
+    }
+  }
+  function renderControls() {
+    seg($("#seg-x"), [[1, "1 min"], [3, "3"], [5, "5"], [10, "10"], [15, "15"], [30, "30"]], "X");
+    seg($("#seg-n"), [[0, "Any"], [1, "1+/wk"], [2, "2+"], [3, "3+"], [5, "5+"]], "N");
+    seg($("#seg-w"), [[2, "2 wks"], [4, "4"], [8, "8"], [12, "12"]], "weeks");
+    seg($("#seg-d"), [["all", "All"], ["wk", "Mon–Fri"], ["we", "Weekend"]], "days");
+    const sv = $("#svc"); sv.innerHTML = "";
+    const present = new Set((IDX?.trains || []).map(t => t.svc));
+    for (const c of SVC_ORDER.filter(c => present.has(c))) {
+      const b = document.createElement("button"); b.className = "chip";
+      b.textContent = (IDX.services[c] || c); b.setAttribute("aria-pressed", String(S.svc.has(c)));
+      b.onclick = () => { S.svc.has(c) ? S.svc.delete(c) : S.svc.add(c); store.set("svc", [...S.svc]); renderControls(); render(); };
+      sv.append(b);
+    }
+    for (const v of ["journey", "station", "network"]) $("#v-" + v).setAttribute("aria-pressed", String(S.view === v));
+    $("#f-journey").hidden = S.view !== "journey";
+    $("#f-station").hidden = S.view !== "station";
+    // A journey always lists every direct train, whatever the service.
+    $("#f-n").hidden = $("#f-svc").hidden = S.view === "journey";
+    if (IDX) {
+      const n = c => (IDX.stations.find(s => s.code === c) || {}).name || "";
+      for (const [id, key] of [["from", "from"], ["to", "to"], ["station", "code"]]) {
+        const el = $("#" + id);
+        if (document.activeElement !== el) { el.value = n(S[key]); el.parentElement.classList.toggle("ok", !!n(S[key])); el.parentElement.classList.remove("bad"); }
+      }
+    }
+  }
+
+  // Accent- and case-insensitive station lookup: "Guimarães", "campanha", "S. Bento" all work.
+  const norm = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/gi, " ").trim().toLowerCase();
+  function findStation(text) {
+    const q = norm(text); if (!q) return null;
+    const byTrains = (a, b) => b.trains - a.trains;
+    const st = IDX.stations;
+    return st.find(s => norm(s.name) === q)
+      || st.filter(s => norm(s.name).startsWith(q)).sort(byTrains)[0]
+      || st.filter(s => norm(s.name).split(" ").some(w => w.startsWith(q)) || norm(s.name).includes(q)).sort(byTrains)[0]
+      || null;
+  }
+  const hm = t => { if (!t) return null; const [h, m] = t.split(":"); return +h * 60 + +m; };
+
+  // ---------- data ----------
+  async function getJSON(u) { const r = await fetch(u, { cache: "no-cache" }); if (!r.ok) throw new Error(r.status + " " + u); return r.json(); }
+  async function station(code) { return ST[code] ||= await getJSON("data/st/" + code + ".json"); }
+  const nm = c => IDX.names[c] || (IDX.stations.find(s => s.code === c) || {}).name || c;
+
+  // ---------- render ----------
+  async function render() {
+    if (!IDX) return;
+    const board = $("#board"), sum = $("#summary");
+    let rows, dates, title, sub;
+    const J = S.view === "journey";
+    if (J) {
+      if (!S.from || !S.to) { sum.innerHTML = ""; board.innerHTML = `<div class="empty">Choose where you're leaving from and where you're going.</div>`; return; }
+      if (S.from === S.to) { sum.innerHTML = ""; board.innerHTML = `<div class="empty">Origin and destination are the same station.</div>`; return; }
+      let A, B;
+      try { [A, B] = await Promise.all([station(S.from), station(S.to)]); }
+      catch { sum.innerHTML = ""; board.innerHTML = `<div class="empty">No data for one of these stations yet.</div>`; return; }
+      const byB = new Map(B.trains.map(r => [r.n, r]));
+      rows = [];
+      for (const ra of A.trains) {
+        const rb = byB.get(ra.n);
+        if (!rb || ra.last) continue;
+        const ta = hm(ra.t), tb = hm(rb.a || rb.t);
+        if (ta == null || tb == null) continue;
+        const dur = (tb - ta + 1440) % 1440;
+        if (dur === 0 || dur > 720) continue;          // B comes before A on this train
+        rows.push({ n: ra.n, svc: ra.svc, o: ra.o, d: ra.d, t: ra.t, a: rb.a || rb.t, dur, v: rb.v, vd: ra.v });
+      }
+      dates = A.dates; title = `${A.name} → ${B.name}`;
+      sub = `Lateness measured on arrival at ${B.name}. Direct trains only.`;
+      if (!rows.length) {
+        sum.innerHTML = `<h2>${esc(title)}</h2><p style="flex-basis:100%">${esc(sub)}</p>`;
+        board.innerHTML = `<div class="empty">No direct trains run from ${esc(A.name)} to ${esc(B.name)}. This journey needs a change of train, which Pontual doesn't cover yet.</div>`;
+        return;
+      }
+    } else if (S.view === "network") {
+      dates = IDX.dates;
+      rows = IDX.trains.map(t => ({ n: t.n, svc: t.svc, o: t.o, d: t.d, t: t.t0, v: t.v, end: t.t1 }));
+      title = "Worst trains on the network";
+      sub = "Delay measured at each train's final stop. Showing the 100 worst for the filters above.";
+    } else {
+      if (!S.code) return;
+      let st;
+      try { st = await station(S.code); } catch { board.innerHTML = `<div class="empty">No data for this station yet.</div>`; sum.innerHTML = ""; return; }
+      dates = st.dates; rows = st.trains; title = st.name;
+      sub = "Delay measured when each train leaves this station (arrival, if it ends here).";
+    }
+    const win = windowIdx(dates);
+    const useSvc = !J && S.svc.size, N = J ? 0 : S.N;
+    let list = rows.filter(r => !useSvc || S.svc.has(r.svc)).map(r => ({ ...r, s: stat(r.v, win) }))
+      .filter(r => r.s.runs > 0);
+    const all = list.length;
+    list = list.filter(r => r.s.perWeek >= N);
+    const sort = S.sort || (S.view === "network" ? "perWeek" : "time");
+    const key = { time: r => r.t || "99", perWeek: r => -r.s.perWeek, share: r => -r.s.share, med: r => -(r.s.med ?? -1), p90: r => -(r.s.p90 ?? -1), cx: r => -r.s.cx };
+    list.sort((a, b) => { const ka = key[sort](a), kb = key[sort](b); return ka < kb ? -1 : ka > kb ? 1 : a.n - b.n; });
+    const runs = list.reduce((a, r) => a + r.s.obs, 0), late = list.reduce((a, r) => a + r.s.late, 0);
+    const matched = list.length;
+    if (S.view === "network") list = list.slice(0, 100);
+    const chronic = rows.filter(r => (!useSvc || S.svc.has(r.svc))).map(r => stat(r.v, win)).filter(s => s.runs && s.perWeek >= 3).length;
+    const span = win.idx.length ? `${fmtDate(dates[win.idx[0]])} – ${fmtDate(dates[win.idx[win.idx.length - 1]])}` : "";
+    if (J) {
+      const counts = {}; for (const r of list) { const k = verdict(r.s).k; counts[k] = (counts[k] || 0) + 1; }
+      const pill = k => counts[k] ? ` <span class="verdict v-${k}">${counts[k]} ${(counts[k] === 1 ? VERDICT[k].one : VERDICT[k].many)}</span>` : "";
+      sum.innerHTML = `<h2>${esc(title)}</h2>
+        <p><b>${all}</b> direct train${all === 1 ? "" : "s"} a day, all services · ${span}</p>
+        <p class="tally">${pill("bad")}${pill("cx")}${pill("warn")}${pill("ok")}${pill("na")}</p>
+        <p style="flex-basis:100%">${esc(sub)} A train counts as late when it reaches ${esc(nm(S.to))} ${S.X}+ min behind schedule. <strong>Repeat offender</strong>: late on half its runs or more. <strong>Often late</strong>: 1 run in 5 or more.</p>`;
+    } else {
+      const plural = (S.N ? matched : all) === 1 ? "" : "s";
+      const noun = "train" + (S.N ? "s" : plural);
+      sum.innerHTML = `<h2>${esc(title)}</h2>
+        <p>${S.N ? `<b>${matched}</b> of ${all} ${noun} are` : `<b>${all}</b> ${noun},`} ${S.N ? `late ${S.X}+ min at least ${S.N}× a week` : `<b>${runs ? Math.round(100 * late / runs) : 0}%</b> of runs late ${S.X}+ min`} · <b>${chronic}</b> late 3+ times a week · ${span}</p>
+        <p style="flex-basis:100%">${esc(sub)}</p>`;
+    }
+
+    if (!list.length) { board.innerHTML = `<div class="empty">No train matches these filters. Try a lower threshold or “Any”.</div>`; return; }
+    const showDays = Math.min(win.idx.length, 28), stripIdx = win.idx.slice(-showDays);
+    const th = (k, label, cls = "") => k ? `<th class="${cls}"><button data-sort="${k}" ${sort === k ? 'aria-sort="descending"' : ""}>${label}</button></th>` : `<th class="${cls}">${label}</th>`;
+    let h = `<table class="${J ? "jt" : ""}"><thead><tr>
+      ${J ? th("time", `Leaves ${esc(nm(S.from))}`) + th(null, `Reaches ${esc(nm(S.to))}`) + th(null, "Train") + th(null, "Verdict")
+          : th("time", S.view === "station" ? "Time" : "Departs") + th(null, "Train") + th(null, "Route")}
+      ${th("perWeek", `Late ${S.X}+ min`, "num")}${th("share", J ? `Chance ${S.X}+ late` : "Of runs", "num")}
+      ${th("med", "Typical", "num")}${th("p90", "Bad day", "num")}${th("cx", "Cancelled", "num")}
+      ${th(null, `Last ${showDays} days`)}</tr></thead><tbody>`;
+    for (const r of list) {
+      const s = r.s, few = s.obs < 4, id = r.n + "@" + (r.t || "");
+      h += `<tr class="row${few ? " dim" : ""}" data-id="${esc(id)}" tabindex="0" aria-expanded="${S.open === id}">
+        <td class="time c-lv">${esc(r.t || "–")}${J ? depLate(r, win) : ""}</td>
+        ${J ? `<td class="time c-rc">${esc(r.a || "–")}<span class="dep-late">${Math.floor(r.dur / 60)}h${String(r.dur % 60).padStart(2, "0")}</span></td>` : ""}
+        ${J ? `<td class="c-tr"><span class="train"><span class="svc ${esc(r.svc)}">${esc(r.svc)}</span><span class="svc-name">${esc(IDX.services[r.svc] || r.svc)}</span> ${r.n}</span>
+                <span class="runs">runs ${esc(nm(r.o))} → ${esc(nm(r.d))}</span></td>
+              <td class="c-vd">${(v => `<span class="verdict v-${v.k}">${v.label}</span>`)(verdict(s))}${ratingLine(r.n)}</td>`
+            : `<td><span class="train"><span class="svc ${esc(r.svc)}">${esc(r.svc)}</span>${r.n}</span>${ratingLine(r.n)}</td>
+              <td class="route">${esc(nm(r.o))}<span class="arrow">→</span>${esc(nm(r.d))}</td>`}
+        <td class="num c-pw" data-l="Late ${S.X}+ min">${freq(s)}</td>
+        <td class="num mins c-ch" data-l="Chance ${S.X}+ late">${s.obs ? Math.round(100 * s.share) + "%" : "–"}</td>
+        <td class="num mins c-ty ${ttone(s.med)}" data-l="Typical">${s.med == null ? "–" : s.med + "′"}</td>
+        <td class="num mins c-bd ${ttone(s.p90)}" data-l="Bad day">${s.p90 == null ? "–" : s.p90 + "′"}</td>
+        <td class="num mins c-cx" data-l="Cancelled">${s.cx || "–"}</td>
+        <td class="c-st"><span class="strip" aria-hidden="true">${stripIdx.map(i => `<i class="${tone(r.v[i])}" title="${dates[i]}: ${lbl(r.v[i])}"></i>`).join("")}</span></td>
+      </tr>`;
+      if (S.open === id) h += `<tr class="detail"><td colspan="${J ? 10 : 9}">${detail(r, dates, win)}</td></tr>`;
+    }
+    board.innerHTML = h + "</tbody></table>";
+    board.querySelectorAll("th button").forEach(b => b.onclick = () => { S.sort = b.dataset.sort; render(); });
+    board.querySelectorAll("[data-vote]").forEach(b => b.onclick = () => vote(+b.dataset.train, b.dataset.vote));
+    board.querySelectorAll("tr.row").forEach(tr => {
+      const tog = () => { S.open = S.open === tr.dataset.id ? null : tr.dataset.id; render(); };
+      tr.onclick = tog; tr.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tog(); } };
+    });
+  }
+
+  const VERDICT = {
+    bad:  { label: "Repeat offender", one: "repeat offender", many: "repeat offenders" },
+    cx:   { label: "Often cancelled", one: "often cancelled", many: "often cancelled" },
+    warn: { label: "Often late",      one: "often late",      many: "often late" },
+    ok:   { label: "Usually on time", one: "usually on time", many: "usually on time" },
+    na:   { label: "Not enough data", one: "with too little data", many: "with too little data" },
+  };
+  function verdict(s) {
+    let k = "ok";
+    if (s.runs < 4) k = "na";
+    else if (s.cx / s.runs >= 0.1) k = "cx";
+    else if (s.share >= 0.5) k = "bad";
+    else if (s.share >= 0.2) k = "warn";
+    return { k, label: VERDICT[k].label };
+  }
+
+  // "3× a week" plus one box per day of the week, so it reads as a frequency, not a score.
+  function freq(s) {
+    const days = S.days === "wk" ? 5 : S.days === "we" ? 2 : 7;
+    const pw = s.perWeek, on = Math.min(days, Math.round(pw));
+    const txt = !s.obs ? "–" : pw === 0 ? "Never" : pw < 0.5 ? "Rarely" : `<b>${Math.round(pw)}×</b> a week`;
+    const cls = pw >= 3 ? "" : pw >= 1 ? "mid" : "low";
+    return `<span class="freq" title="Late ${S.X}+ min on about ${pw.toFixed(1)} days a week"><span class="freq-t">${txt}</span>
+      <span class="wkdots ${cls}" aria-hidden="true">${Array.from({ length: days }, (_, i) => `<i class="${i < on ? "on" : ""}"></i>`).join("")}</span></span>`;
+  }
+
+  // ---------- rider ratings ----------
+  // Production: Supabase (site/config.js). Preview inside Claude: the artifact's shared store.
+  const RT = { backend: null, totals: {}, mine: {}, canVote: false, busy: false, note: "" };
+  const CHOICES = [["match", "Matches my experience"], ["worse", "It's worse than this"], ["better", "It's better than this"]];
+
+  function ratingLine(n) {
+    if (!RT.backend) return "";
+    const t = RT.totals[n], tot = t ? t.match + t.worse + t.better : 0;
+    if (!tot) return `<span class="rate-line">No rider ratings yet</span>`;
+    return `<span class="rate-line"><b>${Math.round(100 * t.match / tot)}%</b> of ${tot} rider${tot === 1 ? "" : "s"} agree</span>`;
+  }
+
+  function rateBlock(r) {
+    if (!RT.backend) return "";
+    const t = RT.totals[r.n] || { match: 0, worse: 0, better: 0 }, tot = t.match + t.worse + t.better, my = RT.mine[r.n];
+    const pc = k => tot ? (100 * t[k] / tot) : 0;
+    const name = `${IDX.services[r.svc] || r.svc} ${r.n}`;
+    const btns = CHOICES.map(([k, l]) => `<button type="button" data-train="${r.n}" data-vote="${k}" aria-pressed="${my === k}" ${RT.canVote && !RT.busy ? "" : "disabled"}>${l}</button>`).join("");
+    return `<div class="rate">
+      <h3>Do you ride ${esc(name)}? Does this record match your experience?</h3>
+      <div class="rate-btns" role="group" aria-label="Your rating">${btns}</div>
+      ${RT.canVote ? `<p class="rate-note">${my ? "Thanks. Tap your answer again to remove it." : "One answer per person. You can change it later."}</p>`
+                   : `<p class="rate-note">${esc(RT.note || "Ratings are read-only here.")}</p>`}
+      ${tot ? `<div class="rate-bar" aria-hidden="true"><i style="width:${pc("match")}%;background:var(--ok)"></i><i style="width:${pc("worse")}%;background:var(--bad)"></i><i style="width:${pc("better")}%;background:var(--cobalt)"></i></div>
+        <div class="rate-key"><span><i style="background:var(--ok)"></i>${t.match} agree</span><span><i style="background:var(--bad)"></i>${t.worse} say it's worse</span><span><i style="background:var(--cobalt)"></i>${t.better} say it's better</span></div>`
+            : `<p class="rate-note">No one has rated this train yet.</p>`}
+    </div>`;
+  }
+
+  async function vote(n, choice) {
+    if (!RT.canVote || RT.busy) return;
+    const prev = RT.mine[n], next = prev === choice ? null : choice;
+    // optimistic update
+    const t = RT.totals[n] ||= { match: 0, worse: 0, better: 0 };
+    if (prev) t[prev] = Math.max(0, t[prev] - 1);
+    if (next) t[next]++;
+    if (next) RT.mine[n] = next; else delete RT.mine[n];
+    RT.busy = true; render();
+    try { await RT.backend.cast(n, next); }
+    catch (e) {
+      if (next) t[next]--; if (prev) t[prev]++;
+      if (prev) RT.mine[n] = prev; else delete RT.mine[n];
+      RT.note = "Your rating couldn't be saved. Try again in a moment.";
+    }
+    RT.busy = false; render();
+  }
+
+  async function initRatings() {
+    const cfg = window.PONTUAL_CONFIG || {};
+    if (cfg.supabaseUrl && cfg.supabaseKey) {
+      const base = cfg.supabaseUrl.replace(/\/+$/, "") + "/rest/v1/rpc/";
+      const headers = { "Content-Type": "application/json", apikey: cfg.supabaseKey };
+      if (cfg.supabaseKey.startsWith("eyJ")) headers.Authorization = "Bearer " + cfg.supabaseKey;
+      const call = async (fn, body) => { const r = await fetch(base + fn, { method: "POST", headers, body: JSON.stringify(body || {}) });
+        if (!r.ok) throw new Error(fn + " " + r.status); return r.status === 204 ? null : r.json(); };
+      let voter = store.get("voter", null);
+      if (!voter) { voter = (crypto.randomUUID && crypto.randomUUID()) || "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)); store.set("voter", voter); }
+      try {
+        const rows = await call("rating_totals");
+        for (const x of rows || []) RT.totals[x.train] = { match: x.matches, worse: x.worse, better: x.better };
+      } catch { return; }   // ratings stay hidden if the database can't be reached
+      RT.mine = store.get("mine", {});
+      RT.canVote = true;
+      RT.backend = { cast: async (n, v) => { await call("cast_rating", { p_train: n, p_voter: voter, p_verdict: v });
+        const m = { ...RT.mine }; store.set("mine", m); } };
+      render();
+      return;
+    }
+    if (!window.claude?.use) return;
+    const db = await window.claude.use("db"), user = await window.claude.use("user");
+    if (!db) return;
+    const uid = user ? await user.id() : null;
+    const may = user ? await user.can("data.write") : null;
+    RT.canVote = !!uid && may !== false;
+    RT.note = uid ? "You can read ratings, but your access to this page doesn't allow rating." : "Sign in to rate trains.";
+    let queue = Promise.resolve();
+    RT.backend = { cast: (n, v) => (queue = queue.then(() => {
+      const body = {}; for (const [k, x] of Object.entries(RT.mine)) body["t" + k] = x;
+      return db.doc("votes/" + uid).set(body);
+    })) };
+    db.collection("votes").onSnapshot(snap => {
+      const totals = {}, mine = {};
+      for (const d of snap.docs) {
+        const body = d.data() || {};
+        for (const [k, v] of Object.entries(body)) {
+          if (!/^t\d+$/.test(k) || !["match", "worse", "better"].includes(v)) continue;
+          const n = +k.slice(1); (totals[n] ||= { match: 0, worse: 0, better: 0 })[v]++;
+          if (d.id === uid) mine[n] = v;
+        }
+      }
+      RT.totals = totals; if (!RT.busy) RT.mine = mine;
+      render();
+    }, () => { RT.canVote = false; RT.note = "Ratings can't be reached right now."; render(); });
+  }
+
+  function depLate(r, win) {
+    const m = stat(r.vd, win).med;
+    return m ? `<span class="dep-late">leaves +${m}′ typ.</span>` : `<span class="dep-late">leaves on time</span>`;
+  }
+
+  function detail(r, dates, win) {
+    const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const by = names.map(() => ({ obs: [], cx: 0 }));
+    for (const i of win.idx) {
+      const x = r.v[i]; if (x == null) continue;
+      const wd = (new Date(dates[i] + "T12:00:00Z").getUTCDay() + 6) % 7;
+      x < 0 ? by[wd].cx++ : by[wd].obs.push(x);
+    }
+    const bars = by.map((b, k) => {
+      const late = b.obs.filter(x => x >= S.X).length, sh = b.obs.length ? late / b.obs.length : null;
+      const col = sh == null ? "transparent" : sh >= .5 ? "var(--bad)" : sh >= .2 ? "var(--warn)" : "var(--ok)";
+      return `<div><b>${sh == null ? "–" : Math.round(sh * 100) + "%"}</b><span class="bar"><i style="height:${sh == null ? 0 : Math.max(4, sh * 100)}%;background:${col}"></i></span>${names[k]}</div>`;
+    }).join("");
+    // calendar: whole window, aligned to Monday
+    const first = win.idx.length ? dates.length - Math.min(dates.length, S.weeks * 7) : 0;
+    const lead = (new Date(dates[first] + "T12:00:00Z").getUTCDay() + 6) % 7;
+    let cells = "<i style='visibility:hidden'></i>".repeat(lead);
+    for (let i = first; i < dates.length; i++) cells += `<i class="${tone(r.v[i])}" title="${dates[i]}: ${lbl(r.v[i])}"></i>`;
+    return `<div class="det">
+      <div><h3>Share of runs late ${S.X}+ min, by weekday</h3><div class="wk">${bars}</div></div>
+      <div><h3>Every day in the period</h3>
+        <div class="cal-days">${names.map(n => `<span>${n[0]}</span>`).join("")}</div>
+        <div class="cal">${cells}</div>
+        <div class="legend">
+          <span><i class="c-ok"></i>under ${S.X} min</span><span><i class="c-warn"></i>${S.X}–${Math.max(15, S.X * 2) - 1} min</span>
+          <span><i class="c-bad"></i>${Math.max(15, S.X * 2)}+ min</span><span><i class="c-x"></i>cancelled</span><span><i></i>no run / no data</span>
+        </div></div>${rateBlock(r)}</div>`;
+  }
+
+  const lbl = x => x == null ? "no data" : x < 0 ? "cancelled" : x + " min late";
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmtDate = d => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+  // ---------- routing ----------
+  // #j-94-38000-to-94-2006  ·  #st-94-38000  ·  #worst
+  function fromHash() {
+    const h = location.hash.slice(1);
+    if (h === "worst") S.view = "network";
+    else if (h.startsWith("st-")) { S.view = "station"; S.code = h.slice(3); }
+    else if (h.startsWith("j-") && h.includes("-to-")) { S.view = "journey"; [S.from, S.to] = h.slice(2).split("-to-"); }
+  }
+  function setHash() {
+    const h = S.view === "network" ? "worst"
+      : S.view === "station" ? (S.code ? "st-" + S.code : "")
+      : (S.from && S.to ? `j-${S.from}-to-${S.to}` : "");
+    if (location.hash.slice(1) !== h) history.replaceState(null, "", h ? "#" + h : location.pathname);
+  }
+  const go = () => { S.open = null; setHash(); renderControls(); render(); };
+  window.addEventListener("hashchange", () => { fromHash(); renderControls(); render(); });
+  for (const v of ["journey", "station", "network"]) $("#v-" + v).onclick = () => { S.view = v; S.sort = null; go(); };
+  // ---------- station picker ----------
+  // Character-by-character normalisation, so highlights line up with the original name.
+  const nchar = c => { const b = c.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); return /^[a-z0-9]$/.test(b) ? b : " "; };
+  const nfold = t => Array.from(String(t), nchar).join("");
+  let REACH = { from: null, map: null };
+  function reachFrom(code) {          // station code → number of direct trains from `code`
+    if (REACH.from === code) return REACH.map;
+    const i0 = IDX.stations.findIndex(s => s.code === code), m = new Map();
+    for (const t of IDX.trains) {
+      const k = (t.p || []).indexOf(i0);
+      if (k < 0) continue;
+      const seen = new Set();
+      for (const j of t.p.slice(k + 1)) { if (seen.has(j)) continue; seen.add(j); const c = IDX.stations[j].code; m.set(c, (m.get(c) || 0) + 1); }
+    }
+    REACH = { from: code, map: m }; return m;
+  }
+  function matches(q) {
+    const nq = nfold(q).trim().replace(/ +/g, " ");
+    if (!nq) return IDX.stations.map(s => ({ s, rank: 3, at: -1, len: 0 }));
+    const out = [];
+    for (const s of IDX.stations) {
+      const nn = nfold(s.name), at = nn.indexOf(nq);
+      if (at < 0) continue;
+      const rank = at === 0 ? 0 : nn[at - 1] === " " ? 1 : 2;
+      out.push({ s, rank, at, len: nq.length });
+    }
+    return out;
+  }
+  const hl = (m) => m.at < 0 ? esc(m.s.name)
+    : esc(m.s.name.slice(0, m.at)) + "<mark>" + esc(m.s.name.slice(m.at, m.at + m.len)) + "</mark>" + esc(m.s.name.slice(m.at + m.len));
+
+  function suggestions(key, q) {
+    let list = matches(q);
+    const empty = !nfold(q).trim();
+    if (key === "to" && S.from) {
+      const reach = reachFrom(S.from);
+      list = list.filter(m => m.s.code !== S.from);
+      const near = list.filter(m => reach.has(m.s.code)).sort((a, b) => a.rank - b.rank || reach.get(b.s.code) - reach.get(a.s.code));
+      const far = empty ? [] : list.filter(m => !reach.has(m.s.code)).sort((a, b) => a.rank - b.rank || b.s.trains - a.s.trains);
+      const fromName = (IDX.stations.find(s => s.code === S.from) || {}).name || "";
+      const items = [];
+      if (near.length) items.push({ head: `Direct from ${fromName}` }, ...near.slice(0, empty ? 12 : 30).map(m => ({ m, hint: `${reach.get(m.s.code)} direct train${reach.get(m.s.code) === 1 ? "" : "s"}` })));
+      if (far.length) items.push({ head: "Needs a change of train" }, ...far.slice(0, 8).map(m => ({ m, hint: "no direct train", far: true })));
+      return items;
+    }
+    list.sort((a, b) => a.rank - b.rank || b.s.trains - a.s.trains);
+    const items = list.slice(0, empty ? 10 : 30).map(m => ({ m, hint: `${m.s.trains} trains a day` }));
+    return empty ? [{ head: "Busiest stations" }, ...items] : items;
+  }
+
+  function combo(input, key) {
+    const box = input.parentElement, ul = box.querySelector(".sugg");
+    let items = [], act = -1;
+    const curName = () => (IDX.stations.find(s => s.code === S[key]) || {}).name || "";
+    const open = () => {
+      // Showing the current choice untouched? List everything, not just that one station.
+      const q = nfold(input.value).trim() === nfold(curName()).trim() ? "" : input.value;
+      items = suggestions(key, q);
+      const picks = items.filter(x => x.m);
+      act = picks.length ? 0 : -1;
+      let k = 0;
+      ul.innerHTML = items.length ? items.map(x => x.head ? `<li class="head" role="presentation">${esc(x.head)}</li>`
+          : `<li role="option" id="${input.id}-o${k}" data-k="${k++}" class="${x.far ? "far" : ""}" aria-selected="false"><span class="nm">${hl(x.m)}</span><span class="hint">${esc(x.hint)}</span></li>`).join("")
+        : `<li class="none" role="presentation">No station matches “${esc(input.value.trim())}”. Check the spelling.</li>`;
+      ul.hidden = false; input.setAttribute("aria-expanded", "true"); mark();
+    };
+    const close = () => { ul.hidden = true; input.setAttribute("aria-expanded", "false"); input.removeAttribute("aria-activedescendant"); };
+    const mark = () => {
+      ul.querySelectorAll("li[data-k]").forEach(li => li.setAttribute("aria-selected", String(+li.dataset.k === act)));
+      const el = ul.querySelector(`li[data-k="${act}"]`);
+      if (el) { input.setAttribute("aria-activedescendant", el.id); el.scrollIntoView({ block: "nearest" }); }
+    };
+    const choose = (k) => {
+      const x = items.filter(i => i.m)[k]; if (!x) return;
+      S[key] = x.m.s.code; store.set(key, S[key]);
+      input.value = x.m.s.name; box.classList.add("ok"); box.classList.remove("bad");
+      close(); input.blur(); go();
+      if (key === "from" && S.view === "journey" && S.to && !reachFrom(S.from).has(S.to)) { $("#to").focus(); }
+    };
+    input.addEventListener("focus", () => { input.select(); open(); });
+    input.addEventListener("input", () => { box.classList.remove("ok", "bad"); open(); });
+    input.addEventListener("keydown", e => {
+      const n = items.filter(i => i.m).length;
+      if (e.key === "ArrowDown") { e.preventDefault(); if (ul.hidden) open(); else { act = Math.min(n - 1, act + 1); mark(); } }
+      else if (e.key === "ArrowUp") { e.preventDefault(); act = Math.max(0, act - 1); mark(); }
+      else if (e.key === "Enter") { e.preventDefault(); if (act >= 0) choose(act); }
+      else if (e.key === "Escape") { close(); input.blur(); }
+    });
+    ul.addEventListener("mousedown", e => e.preventDefault());   // keep focus while tapping
+    ul.addEventListener("click", e => { const li = e.target.closest("li[data-k]"); if (li) choose(+li.dataset.k); });
+    input.addEventListener("blur", () => {
+      close();
+      const cur = (IDX.stations.find(s => s.code === S[key]) || {}).name || "";
+      if (input.value.trim() && nfold(input.value).trim() !== nfold(cur).trim()) {
+        // Typed something but didn't pick: take the best match if there is exactly one sensible one, else revert.
+        const best = suggestions(key, input.value).filter(x => x.m && !x.far);
+        if (best.length && best[0].m.rank === 0 && (best.length === 1 || nfold(best[0].m.s.name).trim() === nfold(input.value).trim())) {
+          S[key] = best[0].m.s.code; store.set(key, S[key]); input.value = best[0].m.s.name; box.classList.add("ok"); go(); return;
+        }
+        box.classList.add("bad"); setTimeout(() => { input.value = cur; box.classList.remove("bad"); box.classList.toggle("ok", !!cur); }, 1600);
+      } else { input.value = cur; box.classList.toggle("ok", !!cur); }
+    });
+  }
+  combo($("#station"), "code"); combo($("#from"), "from"); combo($("#to"), "to");
+  $("#swap").onclick = () => { [S.from, S.to] = [S.to, S.from]; store.set("from", S.from); store.set("to", S.to); go(); };
+
+  // ---------- boot ----------
+  (async () => {
+    try { IDX = await getJSON("data/index.json"); }
+    catch { $("#board").innerHTML = `<div class="empty">No statistics yet. They appear after the first hourly build.</div>`; return; }
+    $("#demo").hidden = !IDX.demo;
+    fromHash();
+    const has = c => c && IDX.stations.some(s => s.code === c);
+    const busiest = [...IDX.stations].sort((a, b) => b.trains - a.trains);
+    if (!has(S.code)) S.code = busiest[0]?.code;
+    // Default journey: Aveiro → Porto Campanhã when present, else the two busiest stations.
+    if (!has(S.from) || !has(S.to)) {
+      [S.from, S.to] = has("94-38000") && has("94-2006") ? ["94-38000", "94-2006"] : [busiest[0]?.code, busiest[1]?.code];
+    }
+    const h = IDX.health || {};
+    $("#foot").innerHTML = `<div>${IDX.dates.length} days of data (${IDX.dates[0] ? fmtDate(IDX.dates[0]) : "–"} – ${IDX.dates.at(-1) ? fmtDate(IDX.dates.at(-1)) : "–"}) · statistics built ${esc(IDX.generated.replace("T", " "))}${h.last_run ? ` · collector last ran ${esc(h.last_run.replace("T", " "))}, ${h.requests ? Math.round(100 * h.ok / h.requests) : 0}% of requests answered` : ""}</div>
+      <div>Unofficial. Based on the live service data CP shows on cp.pt; early arrivals count as on time. “Typical” is the median delay, “bad day” the 90th percentile.</div>`;
+    renderControls(); render();
+    initRatings();
+  })();
+})();
+</script>
+</body>
+</html>
