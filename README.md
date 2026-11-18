@@ -67,6 +67,8 @@ How ratings work:
 
 ## How it works
 
+> **How the 10-minute schedule actually runs:** GitHub only starts scheduled jobs a few times a day when its servers are busy. So each *Collect delays* run keeps going for up to ~5h45m, collecting every 10 minutes, saving after each cycle and rebuilding the site about hourly. The `*/10` schedule just keeps a fresh run queued to take over when one ends. You'll see one long-running job in the Actions tab most of the time; that's normal.
+
 ```
 every 15 min ─ collector/collect.py
    1. read the departure boards of 18 hub stations  →  discover train numbers

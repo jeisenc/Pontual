@@ -1,6 +1,9 @@
 name: Collect delays
 
-# Every 10 minutes: sample running trains on IP's live feed, save finished ones.
+# GitHub only starts scheduled jobs a few times a day when its servers are busy,
+# so each run keeps going for up to ~5h45m: every 10 minutes it samples the
+# running trains, saves what it learned, and about hourly it rebuilds the site.
+# The schedule below just makes sure a new run is always queued to take over.
 on:
   schedule:
     - cron: "*/10 * * * *"
@@ -8,15 +11,16 @@ on:
 
 permissions:
   contents: write
+  actions: write          # to start "Publish dashboard" from inside the run
 
 concurrency:
   group: collect
-  cancel-in-progress: false
+  cancel-in-progress: false   # a run in progress is never cut short; the next one waits
 
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
 
@@ -24,18 +28,47 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Collect
-        run: python collector/collect.py
-
-      - name: Save data
+      - name: Collect every 10 minutes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_MINUTES: "340"
+          EVERY_SECONDS: "600"
+          PUBLISH_EVERY_SECONDS: "3600"
         run: |
           git config user.name  "pontual-bot"
           git config user.email "pontual-bot@users.noreply.github.com"
-          git add data
-          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
-          git commit -q -m "data: $(TZ=Europe/Lisbon date '+%Y-%m-%d %H:%M')"
-          for i in 1 2 3; do
-            git pull -q --rebase && git push -q && exit 0
-            sleep 5
+          end=$(( $(date +%s) + RUN_MINUTES * 60 ))
+          last_publish=$(date +%s)
+          cycles=0; failures=0
+          while [ "$(date +%s)" -lt "$end" ]; do
+            started=$(date +%s)
+            cycles=$((cycles + 1))
+            if ! python collector/collect.py; then
+              failures=$((failures + 1))
+              echo "::warning::collection cycle $cycles failed"
+            fi
+
+            git add data
+            if ! git diff --cached --quiet; then
+              git commit -q -m "data: $(TZ=Europe/Lisbon date '+%Y-%m-%d %H:%M')"
+              for i in 1 2 3; do
+                git pull -q --rebase && git push -q && break
+                sleep 5
+              done
+            fi
+
+            now=$(date +%s)
+            if [ $((now - last_publish)) -ge "$PUBLISH_EVERY_SECONDS" ]; then
+              gh workflow run publish.yml --ref "${GITHUB_REF_NAME}" || echo "::warning::could not start publish"
+              last_publish=$now
+            fi
+
+            wait=$(( started + EVERY_SECONDS - $(date +%s) ))
+            remaining=$(( end - $(date +%s) ))
+            [ "$remaining" -le "$wait" ] && break
+            [ "$wait" -gt 0 ] && sleep "$wait"
           done
-          exit 1
+          echo "cycles: $cycles, failed: $failures"
+          # Fail the run (GitHub emails the owner) if most cycles could not reach the source.
+          [ "$cycles" -gt 0 ] && [ $((failures * 2)) -gt "$cycles" ] && exit 1
+          exit 0
