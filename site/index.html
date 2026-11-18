@@ -145,6 +145,31 @@ tr.row.dim td { color: var(--muted); }
 .arr-bar i { display: block; height: 100%; border-radius: 4px; }
 .arr-n { font: .78rem var(--mono); color: var(--muted); white-space: nowrap; }
 @media (max-width: 560px) { .arr-row { grid-template-columns: 7.5em 4em minmax(40px, 1fr); } .arr-n { grid-column: 2 / -1; white-space: normal; } }
+.cmp { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: grid; gap: 12px; }
+.cmp-row { display: grid; grid-template-columns: minmax(8em, 13em) minmax(80px, 1fr) 11em; grid-template-areas: "name track val" "name n n"; gap: 2px 14px; align-items: center; }
+.cmp-name { grid-area: name; font: 600 1.05rem var(--display); display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.cmp-track { grid-area: track; display: flex; height: 18px; background: var(--empty); border-radius: 4px; overflow: hidden; }
+.cmp-track i, .cmp-key i { display: block; height: 100%; }
+.seg-late { background: var(--warn); } .seg-bad { background: var(--bad); }
+.cmp-val { grid-area: val; font: .85rem var(--mono); white-space: nowrap; }
+.cmp-val b { font-size: 1rem; }
+.cmp-n { grid-area: n; font-size: .75rem; color: var(--muted); }
+.cmp-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 0 4px; line-height: 1; }
+.cmp-x:hover { color: var(--bad); }
+.cmp-key { display: flex; gap: 16px; font-size: .8rem; color: var(--muted); }
+.cmp-key span { display: inline-flex; align-items: center; gap: 6px; }
+.cmp-key i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.ranks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; margin-top: 18px; }
+.ranks h3 { margin: 0 0 8px; font: 600 1.1rem var(--display); }
+.ranks ol { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; }
+.ranks li span { float: right; font-family: var(--mono); }
+.ranks .rate-note { grid-column: 1 / -1; }
+.link { border: 0; background: none; padding: 0; color: var(--cobalt); cursor: pointer; font: inherit; text-align: left; }
+.link:hover { text-decoration: underline; }
+@media (max-width: 640px) {
+  .cmp-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name val" "track track" "n n"; }
+  .ranks { grid-template-columns: minmax(0, 1fr); }
+}
 .rate { grid-column: 1 / -1; display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 16px; }
 .rate h3 { margin: 0; }
 .rate-btns { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -222,6 +247,7 @@ footer code { font-family: var(--mono); }
     <div class="views" role="group" aria-label="View">
       <button id="v-journey" aria-pressed="true">Journey</button>
       <button id="v-station" aria-pressed="false">By station</button>
+      <button id="v-compare" aria-pressed="false">Compare stations</button>
       <button id="v-network" aria-pressed="false">Worst trains</button>
     </div>
   </header>
@@ -243,6 +269,12 @@ footer code { font-family: var(--mono); }
           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="to-list"><span class="tick" aria-hidden="true">✓</span>
           <ul class="sugg" id="to-list" role="listbox" aria-label="Stations to go to" hidden></ul></div>
       </div>
+    </div>
+    <div class="field" id="f-cmp">
+      <label for="cmp">Add a station to compare</label>
+      <div class="combo"><input id="cmp" class="station-in" placeholder="e.g. Leiria" autocomplete="off" autocapitalize="words" spellcheck="false"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cmp-list"><span class="tick" aria-hidden="true">✓</span>
+          <ul class="sugg" id="cmp-list" role="listbox" aria-label="Stations to compare" hidden></ul></div>
     </div>
     <div class="field" id="f-station">
       <label for="station">Station</label>
@@ -300,6 +332,7 @@ footer code { font-family: var(--mono); }
     N: store.get("N", 0),
     weeks: store.get("weeks", 4),
     plan: store.get("plan", "p50"),
+    cmp: store.get("cmp", null),
     days: store.get("days", "all"),
     svc: new Set(store.get("svc", [])),
     sort: null,
@@ -358,11 +391,12 @@ footer code { font-family: var(--mono); }
       b.onclick = () => { S.svc.has(c) ? S.svc.delete(c) : S.svc.add(c); store.set("svc", [...S.svc]); renderControls(); render(); };
       sv.append(b);
     }
-    for (const v of ["journey", "station", "network"]) $("#v-" + v).setAttribute("aria-pressed", String(S.view === v));
+    for (const v of VIEWS) $("#v-" + v).setAttribute("aria-pressed", String(S.view === v));
+    $("#f-cmp").hidden = S.view !== "compare";
     $("#f-journey").hidden = S.view !== "journey";
     $("#f-station").hidden = S.view !== "station";
     // A journey always lists every direct train, whatever the service.
-    $("#f-n").hidden = $("#f-svc").hidden = S.view === "journey";
+    $("#f-n").hidden = $("#f-svc").hidden = S.view === "journey" || S.view === "compare";
     $("#f-plan").hidden = S.view !== "journey";
     if (IDX) {
       const n = c => (IDX.stations.find(s => s.code === c) || {}).name || "";
@@ -394,6 +428,7 @@ footer code { font-family: var(--mono); }
   // ---------- render ----------
   async function render() {
     if (!IDX) return;
+    if (S.view === "compare") return renderCompare();
     const board = $("#board"), sum = $("#summary");
     let rows, dates, title, sub;
     const J = S.view === "journey";
@@ -709,23 +744,92 @@ footer code { font-family: var(--mono); }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmtDate = d => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
+  // ---------- compare stations ----------
+  const VIEWS = ["journey", "station", "compare", "network"];
+  const MIN_CALLS = 30;          // fewer train calls than this: "too little data"
+  let CMP = null;
+  const DEFAULT_CMP = ["9438000", "9463560", "9402006", "9429157", "9436004", "9431039"]; // Aveiro, Leiria, Campanhã, Braga, Coimbra-B, Oriente
+  function cmpList() {
+    const known = c => IDX.stations.some(s => s.code === c);
+    return (S.cmp || DEFAULT_CMP).filter(known);
+  }
+  // Totals for one station over the chosen period and days.
+  function cmpStat(code, win) {
+    const rows = (CMP.stations[code] || []), keep = new Set(win.idx);
+    const t = new Array(CMP.edges.length + 1).fill(0);
+    for (const [i, ...c] of rows) if (keep.has(i)) c.forEach((x, k) => t[k] += x);
+    const calls = t.slice(0, CMP.edges.length).reduce((a, b) => a + b, 0);
+    const from = e => CMP.edges.findIndex(x => x >= e);
+    const atLeast = e => { const k = from(e); return k < 0 ? 0 : t.slice(k, CMP.edges.length).reduce((a, b) => a + b, 0); };
+    const late = atLeast(S.X), bad = atLeast(15);
+    return { calls, cx: t[CMP.edges.length], late, bad,
+      pLate: calls ? late / calls : null, pBad: calls ? bad / calls : null };
+  }
+  async function renderCompare() {
+    const board = $("#board"), sum = $("#summary");
+    if (!CMP) {
+      try { CMP = await getJSON("data/stations_stats.json"); }
+      catch { sum.innerHTML = ""; board.innerHTML = `<div class="empty">Station statistics aren't available yet. They appear after the next site build.</div>`; return; }
+    }
+    const win = windowIdx(CMP.dates);
+    const span = win.idx.length ? `${fmtDate(CMP.dates[win.idx[0]])} – ${fmtDate(CMP.dates[win.idx.at(-1)])}` : "";
+    const bigX = Math.max(15, S.X);
+    const pct = v => v == null ? "–" : `${Math.round(100 * v)}%`;
+    const picked = cmpList().map(c => ({ code: c, name: nm(c), ...cmpStat(c, win) }));
+    const enough = picked.filter(p => p.calls >= MIN_CALLS).sort((a, b) => a.pLate - b.pLate);
+    const thin = picked.filter(p => p.calls < MIN_CALLS);
+    const scale = 1;   // bars on a true 0–100% scale
+    const bar = p => {
+      const w1 = 100 * (p.pLate - (S.X < 15 ? p.pBad : 0)) / scale, w2 = 100 * (S.X < 15 ? p.pBad : 0) / scale;
+      return `<div class="cmp-row">
+        <span class="cmp-name">${esc(p.name)}<button type="button" class="cmp-x" data-rm="${p.code}" aria-label="Remove ${esc(p.name)}">×</button></span>
+        <span class="cmp-track" role="img" aria-label="${esc(p.name)}: ${pct(p.pLate)} of trains ${S.X}+ min late, ${pct(p.pBad)} 15+ min late">
+          <i class="seg-late" style="width:${w1}%"></i><i class="seg-bad" style="width:${w2}%"></i></span>
+        <span class="cmp-val"><b>${pct(p.pLate)}</b> late${S.X < 15 ? ` · <span class="t-bad">${pct(p.pBad)}</span> 15+` : ""}</span>
+        <span class="cmp-n">${p.calls.toLocaleString("en-GB")} train calls${p.cx ? ` · ${p.cx} cancelled` : ""}</span>
+      </div>`;
+    };
+    // Network ranking among stations with plenty of data.
+    const all = Object.keys(CMP.stations).map(c => ({ code: c, name: nm(c), ...cmpStat(c, win) })).filter(p => p.calls >= 100);
+    all.sort((a, b) => a.pLate - b.pLate || b.calls - a.calls);
+    const best = all.slice(0, 8), worst = all.slice(-8).reverse();
+    const rank = (list, cls) => list.map(p => `<li><button type="button" class="link" data-add="${p.code}">${esc(p.name)}</button><span class="${cls}">${pct(p.pLate)}</span></li>`).join("");
+
+    sum.innerHTML = `<h2>How stations compare</h2>
+      <p>${span} · share of trains at each station that were <b>${S.X}+ min</b> late${S.X < 15 ? `, with the part that was <b>15+ min</b> late in dark red` : ""}. Best at the top.</p>
+      <p style="flex-basis:100%">A station's figure covers every train that called there, measured as it left (or arrived, if it ended there). Stations far down a long line inherit delays from upstream, so they tend to look worse than stations near the start of a line.</p>${earlyNote()}`;
+    board.innerHTML = `<div class="cmp">
+      ${enough.length ? enough.map(bar).join("") : `<div class="empty">Add stations above to compare them.</div>`}
+      ${thin.length ? `<p class="rate-note">Too little data so far: ${thin.map(p => `${esc(p.name)} (${p.calls} train calls) <button type="button" class="cmp-x" data-rm="${p.code}" aria-label="Remove ${esc(p.name)}">×</button>`).join(", ")}. A station needs ${MIN_CALLS}+ recorded train calls in the period.</p>` : ""}
+      <div class="cmp-key"><span><i class="seg-late"></i>${S.X}${S.X < 15 ? "–14" : "+"} min late</span>${S.X < 15 ? `<span><i class="seg-bad"></i>15+ min late</span>` : ""}</div>
+    </div>
+    ${all.length >= 10 ? `<div class="ranks">
+      <div><h3>Most punctual stations</h3><ol>${rank(best, "t-ok")}</ol></div>
+      <div><h3>Least punctual stations</h3><ol>${rank(worst, "t-bad")}</ol></div>
+      <p class="rate-note">Among ${all.length} stations with 100+ recorded train calls in the period. Tap a name to add it to the chart.</p>
+    </div>` : ""}`;
+    board.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { S.cmp = cmpList().filter(c => c !== b.dataset.rm); store.set("cmp", S.cmp); render(); });
+    board.querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const l = cmpList(); if (!l.includes(b.dataset.add)) { S.cmp = [...l, b.dataset.add]; store.set("cmp", S.cmp); } render(); });
+  }
+
   // ---------- routing ----------
   // #j-94-38000-to-94-2006  ·  #st-94-38000  ·  #worst
   function fromHash() {
     const h = location.hash.slice(1);
     if (h === "worst") S.view = "network";
+    else if (h === "compare") S.view = "compare";
     else if (h.startsWith("st-")) { S.view = "station"; S.code = h.slice(3); }
     else if (h.startsWith("j-") && h.includes("-to-")) { S.view = "journey"; [S.from, S.to] = h.slice(2).split("-to-"); }
   }
   function setHash() {
-    const h = S.view === "network" ? "worst"
+    const h = S.view === "network" ? "worst" : S.view === "compare" ? "compare"
       : S.view === "station" ? (S.code ? "st-" + S.code : "")
       : (S.from && S.to ? `j-${S.from}-to-${S.to}` : "");
     if (location.hash.slice(1) !== h) history.replaceState(null, "", h ? "#" + h : location.pathname);
   }
   const go = () => { S.open = null; setHash(); renderControls(); render(); };
   window.addEventListener("hashchange", () => { fromHash(); renderControls(); render(); });
-  for (const v of ["journey", "station", "network"]) $("#v-" + v).onclick = () => { S.view = v; S.sort = null; go(); };
+  for (const v of VIEWS) $("#v-" + v).onclick = () => { S.view = v; S.sort = null; go(); };
   // ---------- station picker ----------
   // Character-by-character normalisation, so highlights line up with the original name.
   const nchar = c => { const b = c.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); return /^[a-z0-9]$/.test(b) ? b : " "; };
@@ -776,7 +880,7 @@ footer code { font-family: var(--mono); }
     return empty ? [{ head: "Busiest stations" }, ...items] : items;
   }
 
-  function combo(input, key) {
+  function combo(input, key, onPick) {
     const box = input.parentElement, ul = box.querySelector(".sugg");
     let items = [], act = -1;
     const curName = () => (IDX.stations.find(s => s.code === S[key]) || {}).name || "";
@@ -800,6 +904,7 @@ footer code { font-family: var(--mono); }
     };
     const choose = (k) => {
       const x = items.filter(i => i.m)[k]; if (!x) return;
+      if (onPick) { input.value = ""; close(); input.blur(); onPick(x.m.s.code); return; }
       S[key] = x.m.s.code; store.set(key, S[key]);
       input.value = x.m.s.name; box.classList.add("ok"); box.classList.remove("bad");
       close(); input.blur(); go();
@@ -818,6 +923,7 @@ footer code { font-family: var(--mono); }
     ul.addEventListener("click", e => { const li = e.target.closest("li[data-k]"); if (li) choose(+li.dataset.k); });
     input.addEventListener("blur", () => {
       close();
+      if (onPick) { input.value = ""; return; }
       const cur = (IDX.stations.find(s => s.code === S[key]) || {}).name || "";
       if (input.value.trim() && nfold(input.value).trim() !== nfold(cur).trim()) {
         // Typed something but didn't pick: take the best match if there is exactly one sensible one, else revert.
@@ -830,6 +936,7 @@ footer code { font-family: var(--mono); }
     });
   }
   combo($("#station"), "code"); combo($("#from"), "from"); combo($("#to"), "to");
+  combo($("#cmp"), "cmp", code => { const l = cmpList(); if (!l.includes(code)) { S.cmp = [...l, code]; store.set("cmp", S.cmp); } render(); });
   $("#swap").onclick = () => { [S.from, S.to] = [S.to, S.from]; store.set("from", S.from); store.set("to", S.to); go(); };
 
   // ---------- boot ----------

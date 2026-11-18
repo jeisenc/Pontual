@@ -146,6 +146,32 @@ def main():
         "health": health,
     }
     (OUT / "index.json").write_text(json.dumps(index, ensure_ascii=False, separators=(",", ":")), "utf-8")
+
+    # Station comparison: per station and day, how many train calls fell in each
+    # delay band. Bands start at 0, 1, 3, 5, 10, 15 and 30 minutes, matching the
+    # dashboard's "late means at least" choices; the last count is cancellations.
+    edges = [0, 1, 3, 5, 10, 15, 30]
+
+    def band(x):
+        b = 0
+        for i, e in enumerate(edges):
+            if x >= e:
+                b = i
+        return b
+
+    comp = {}
+    for code, rows in st_rows.items():
+        days = {}
+        for r in rows.values():
+            for i, x in enumerate(r["v"]):
+                if x is None:
+                    continue
+                c = days.setdefault(i, [0] * (len(edges) + 1))
+                c[len(edges) if x < 0 else band(x)] += 1
+        if days:
+            comp[code] = [[i, *c] for i, c in sorted(days.items())]
+    (OUT / "stations_stats.json").write_text(json.dumps(
+        {"dates": iso, "edges": edges, "stations": comp}, separators=(",", ":")), "utf-8")
     print(f"{len(dates)} days ({iso[0] if iso else '-'} → {iso[-1] if iso else '-'}), "
           f"{len(final)} trains, {len(st_index)} stations, statuses {dict(statuses)}")
 
